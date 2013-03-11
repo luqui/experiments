@@ -1,7 +1,7 @@
-{-# LANGUAGE RankNTypes, GADTs, TupleSections #-}
+{-# LANGUAGE RankNTypes, GADTs, TupleSections, DoRec #-}
 
 import Control.Monad.Fix
-import Control.Monad (liftM, (>=>))
+import Control.Monad (liftM, (>=>), join)
 
 data FFree f a where
     Pure   :: a -> FFree f a
@@ -23,3 +23,16 @@ instance (Functor f) => MonadFix (FFree f) where
     mfix f = Fix (liftM dup . f)
 
 dup x = (x,x)
+
+
+initial :: (MonadFix m) => FFree m a -> m a
+initial (Pure x) = return x
+initial (Effect e) = join (liftM initial e)
+initial (Fix f) = do
+    rec (s,x) <- initial (f s)
+    return x
+
+
+main = (print =<<) . initial $ do
+    rec xs <- Effect (putStrLn "Hello!" >> return (Pure ())) >> return (1:xs)
+    return (take 10 xs)
