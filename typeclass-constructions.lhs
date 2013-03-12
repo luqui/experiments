@@ -1,4 +1,7 @@
-> {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, TypeOperators #-}
+> {-# LANGUAGE DeriveFunctor
+>            , DeriveFoldable
+>            , DeriveTraversable
+>            , TypeOperators #-}
 >
 > import Control.Applicative
 > import Data.Foldable
@@ -92,7 +95,8 @@ Motivated by the examples in the introduction, we can find
 
 and we hope we can find
 
-    applicativeAlg :: (Functor t, Applicative f) => Algebra t a -> Algebra t (f a)
+    applicativeAlg :: (Functor t, Applicative f) 
+                   => Algebra t a -> Algebra t (f a)
 
 but there turns out to be trouble
 
@@ -106,7 +110,8 @@ This hints at something from the standard library:
 which indicates that our functor needs more structure to implement
 `applicativeAlg`.
 
-> applicativeAlg :: (Traversable t, Applicative f) => Algebra t a -> Algebra t (f a)
+> applicativeAlg :: (Traversable t, Applicative f) 
+>                => Algebra t a -> Algebra t (f a)
 > applicativeAlg alg tfa = fmap alg (sequenceA tfa)
 
 Now we should be able to answer the query from the beginning:
@@ -126,7 +131,8 @@ demonstrated by the following construction:
 > data (f :+: g) a = InL (f a) | InR (g a)
 >     deriving (Functor, Foldable, Traversable)
 >
-> coproductAlg :: (Functor f, Functor g) => Algebra f a -> Algebra g a -> Algebra (f :+: g) a
+> coproductAlg :: (Functor f, Functor g) 
+>              => Algebra f a -> Algebra g a -> Algebra (f :+: g) a
 > coproductAlg falg _ (InL fa) = falg fa
 > coproductAlg _ galg (InR ga) = galg ga
 
