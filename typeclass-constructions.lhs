@@ -11,7 +11,7 @@ Certain kinds of typeclasses have some very regular instances.  For example, it
 is obvious how to implement `(Num a, Num b) => Num (a,b)` and `(Monoid a, Monoid
 b) => Monoid (a,b)`, and similarly if `F` is some applicative functor, `(Num a)
 => Num (F a)` and `(Monoid a) => (Monoid F a)` are obvious.  Furthermore, these
-two classes (and many others) seem to be obvious in the same way.  
+instances (and many others) seem to be obvious in the same way.  
 
     (+) a b     = (+)     <$> a <*> b
     mappend a b = mappend <$> a <*> b
@@ -40,18 +40,18 @@ without making a special case for `[]`, whereas hopefully a more abstract
 perspective would inform us what kinds of type constructors would be supported.
 
 In this post, we will see such an abstract perspective.  It comes from
-(surprise!) category theory; and I disclaim that I'm still a novice with
-category theory (but in the past few weeks I have gained competence by
-studying).  So we will not get very deep into the theory, just enough to steal
-the useful concept and leave the rest behind.  I welcome relevant insights from
-the more categorically educated in the comments.
+(surprise!) category theory.  I disclaim that I'm still a novice with category
+theory (but in the past few weeks I have gained competence by studying).  So we
+will not get very deep into the theory, just enough to steal the useful concept
+and leave the rest behind.  I welcome relevant insights from the more
+categorically educated in the comments.
 
 F-Algebras
 ----------
 
 The unifying concept we will steal is the
 [*F-algebra*](http://en.wikipedia.org/wiki/F-algebra).  An F-algebra is a
-Functor `F` and a type `a` together with a function `F a -> a`.  We can make
+Functor `f` and a type `a` together with a function `f a -> a`.  We can make
 this precise in Haskell:
 
 > type Algebra f a = f a -> a
@@ -75,12 +75,17 @@ function of type `f m -> m`.  With some squinting, we arrive at:
 > mappendF :: Algebra MonoidF m -> (m -> m -> m)
 > mappendF alg x y = alg (MAppend x y)
 
-**Exercise 1:** work out the functor `NumF` over which `Num` instances are
-F-algebras, and write the methods of `Num` in terms of it.
+**Exercise 1:** work out the functor `NumF` over which
+[`Num`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html3t:Num)
+instances are F-algebras, and write the methods of `Num` in terms of it.
 
-**Exercise 2:** for each of the standard classes `Eq`, `Read`, `Show`, `Bounded`,
-and `Integral`, work out whether they are expressible as F-algebras.  If so,
-give the functor; if not, explain or prove why not.
+**Exercise 2:** for each of the standard classes 
+[`Eq`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html#t:Eq), 
+[`Read`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html#t:Read), 
+[`Show`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html#t:Show), 
+[`Bounded`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html#t:Bounded),
+and [`Integral`](http://www.haskell.org/ghc/docs/latest/html/libraries/base/Prelude.html#t:Integral),work out whether they are expressible as F-algebras.  If so, give the functor; if not, explain or 
+prove why not.
 
 **Exercise 3:** write a function `toMonoidAlg` which finds the `MonoidF`-algebra
 for a given instance `m` of the `Monoid` class.
@@ -88,17 +93,19 @@ for a given instance `m` of the `Monoid` class.
 Combining Instances
 -------------------
 
-Motivated by the examples in the introduction, we can find
+Motivated by the examples in the introduction, we can find the "instance" for
+pairs given instances for each of the components.
 
 > pairAlg :: (Functor t) => Algebra t a -> Algebra t b -> Algebra t (a,b)
 > pairAlg alga algb tab = (alga (fmap fst tab), algb (fmap snd tab))
 
-and we hope we can find
+Also, we hope we can find the instance for an applicative functor given an
+instance for its argument
 
     applicativeAlg :: (Functor t, Applicative f) 
                    => Algebra t a -> Algebra t (f a)
 
-but there turns out to be trouble
+but there turns out to be trouble:
 
     applicativeAlg alg tfa = ...
 
@@ -116,10 +123,10 @@ which indicates that our functor needs more structure to implement
 
 Now we should be able to answer the query from the beginning:
 
-**Exercise 4:** For what kinds of type constructors `f` is it possible to
-automatically derive instances for pairs, `Applicative`s for a typeclass with a
-method of type `f a -> a`.  (e.g. `mconcat :: [a] -> a`).  Demonstrate this with
-an implementation.
+**Exercise 4:** For what kinds of type constructors `c` is it possible to
+automatically derive instances for *(a)* pairs and *(b)* `Applicative`s for a
+typeclass with a method of type `c a -> a`.  (e.g. `mconcat :: [a] -> a`).
+Demonstrate this with an implementation.
 
 Combining Classes
 -----------------
@@ -189,8 +196,9 @@ F-algebra over that functor.
 > initiality alg (Pure a) = a
 > initiality alg (Effect f) = alg (fmap (initiality alg) f)
 
-**Exercise 7:** Give an isomorphism between `Free MonoidF` and lists `[]`,
-ignoring that Haskell allows infinitely large terms.  Then, using an infinite
-term, show how this isomorphism fails. 
+**Exercise 7:** Give a monoid isomorphism (a bijection that preserves the
+monoid operations) between `Free MonoidF` and lists `[]`, ignoring that Haskell
+allows infinitely large terms.  Then, using an infinite term, show how this
+isomorphism fails. 
 
 *Next time: F-Coalgebras*
