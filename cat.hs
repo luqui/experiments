@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances, GADTs, FlexibleContexts, ConstraintKinds, PolyKinds, KindSignatures, ScopedTypeVariables, RankNTypes #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances, GADTs, FlexibleContexts, ConstraintKinds, PolyKinds, KindSignatures, DataKinds, ScopedTypeVariables, RankNTypes #-}
 
 import qualified Prelude
 import Prelude hiding ((.), id, Functor, fmap, Monad, return, (>>=), (=<<))
@@ -99,35 +99,5 @@ instance Functor (FCat f) Hask f where
     fmap (FCat f) = f
 
 
-data Sub c a = Sub (c a => a)
-
-data CCat c a b where
-    CCatId :: CCat c a a
-    CCat :: (c a, c b) => (a -> b) -> CCat c a b
-
-instance Category (CCat c) where
-    id = CCatId
-    CCat g . CCat f = CCat (g . f)
-
-instance Functor (CCat c) Hask (Sub c) where
-    fmap CCatId x = x
-    fmap (CCat f) (Sub x) = Sub (f x)
 
 
-instance Functor (CCat Ord) (CCat Ord) Set.Set where
-    fmap CCatId = id
-    fmap (CCat f) = CCat (Set.map f)
-
-instance Functor (FCat (Sub Ord)) (FCat (Sub Ord)) Set.Set where
-    fmap (FCat f) = FCat (\(Sub s) -> Sub (Set.map f' s))
-        where
-        f' x = let Sub y = f (Sub x) in y
-    
-
-{-
-instance Functor (SubMor Ord) (SubMor Ord) Set.Set where
-    fmap (SubMor f) = SubMor t
-        where
-        t (Sub s) = Sub (Set.map f' s)
-        f' a = let Sub b = f (Sub a) in b
--}
