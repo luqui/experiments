@@ -74,12 +74,25 @@ I = record { FObj = \x -> x ; FHom = \f -> f }
 
 
 -- Product
-record Products {C : Category} : Set where
+record Products (C : Category) : Set where
   field
     _⊗_ : Obj C -> Obj C -> Obj C
     ⟨_,_⟩ : forall {X₁ X₂ Y} -> Hom C Y X₁ -> Hom C Y X₂ -> Hom C Y (X₁ ⊗ X₂)
     π₁ : forall {X₁ X₂} -> Hom C (X₁ ⊗ X₂) X₁
     π₂ : forall {X₁ X₂} -> Hom C (X₁ ⊗ X₂) X₂
+
+_/_⊗_ = Products._⊗_
+
+data Prod (A B : Set) : Set where
+  prod : A -> B -> Prod A B
+
+AgdaProducts : Products Agda
+AgdaProducts = 
+  record { _⊗_ = Prod
+         ; ⟨_,_⟩ = \f g x -> prod (f x) (g x)
+         ; π₁ = \{ (prod x _) -> x }
+         ; π₂ = \{ (prod _ y) -> y }
+         }
 
 -- Monads
 record Monad (C : Category) : Set where
@@ -87,6 +100,20 @@ record Monad (C : Category) : Set where
     T    : Obj (Endo C)
     unit : Hom (Endo C) I T
     join : Hom (Endo C) (Cat / T o T) T
+
+
+
+record Algebra {C : Category} (F : Obj (Endo C)) : Set where
+  field
+    A : Obj C
+    alg : Hom C (FObj F A) A
+
+Alg : {C : Category} (F : Obj (Endo C)) -> Category
+Alg {C} F = 
+  record { Obj = Algebra F
+         ; Hom = \a b -> Hom C (Algebra.A a) (Algebra.A b)
+         ; _/_o_ = \g f -> C / g o f
+         }
 
 
 -- We have phrased Monad in terms of Objs and Homs -- but if we can make
