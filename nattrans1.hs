@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, RankNTypes, TypeOperators, TypeFamilies, UndecidableInstances, ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds, RankNTypes, TypeOperators, TypeFamilies, UndecidableInstances, ScopedTypeVariables, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 
 import Prelude hiding (id, (.), fst, snd, curry, uncurry)
 import GHC.Prim (Any)
@@ -45,6 +45,10 @@ applyToIso = Iso getApplyTo ApplyTo
 haskIso = Iso getHask Hask
 liftIso = Iso getLift Lift
 unliftIso = Iso getUnlift Unlift
+
+
+data Cat2 (a :: * -> *) (b :: * -> *) = Cat2
+
 
 
 {-
@@ -105,32 +109,70 @@ instance Category hom => Category (Lift hom) where
     id = Lift id
     Lift g . Lift f = Lift (g . f)
 
-newtype PreNT (hom :: ((c -> *) -> *) -> ((c -> *) -> *) -> *)
-           (f :: b -> c)
-           (g :: b -> c)
-    = PreNT { getPreNT :: forall (x :: b). Lift hom (f x) (g x) }
 
-type NT hom = PreNT (Unlift hom)
+unliftId :: (Category hom) => (forall a. hom a a) -> (forall a. Unlift hom a a)
+unliftId = unsafeCoerce
 
-getNT :: NT hom f g -> hom (f a) (g a)
-getNT =                    -- :: NT (Unlift hom) f g
-       getPreNT            -- :: Lift (Unlift hom) (f x) (g x)
-    .> forward liftUnlift  -- :: hom (f a) (g a)
+unliftCompose :: (Category hom) => (forall a b c. hom b c -> hom a b -> hom a c)
+                                -> (forall a b c. Unlift hom b c -> Unlift hom a b -> Unlift hom a c)
+unliftCompose = unsafeCoerce
+
+instance Category hom => Category (Unlift hom) where
+    id = unliftId id
+    (.) = unliftCompose (.)
+
+newtype PreNT (hom :: c -> c -> *)
+           (f :: b -> ((c -> *) -> *))
+           (g :: b -> ((c -> *) -> *))
+    = PreNT { getPreNT :: forall x. Unlift hom (f x) (g x) }
+
+newtype LiftF (f :: b -> c) (x :: b) (c :: c -> *) = LiftF { getLiftF :: c (f x) }
+
+newtype NT hom f g = NT { getNT :: PreNT hom (LiftF f) (LiftF g) }
+
+
 
 instance (Category hom) => Category (PreNT hom) where
     id = PreNT id
     PreNT g . PreNT f = PreNT (g . f)
 
+class Category hom => Products (hom :: k -> k -> *) (p :: k -> k -> k) | hom -> p where
+    (&&&) :: hom a b -> hom a c -> hom a (p b c)
+    fst :: hom (p a b) a
+    snd :: hom (p a b) b
+
+instance Products (->) (,) where
+    (f &&& g) x = (f x, g x)
+    fst (x,_) = x
+    snd (_,y) = y
+
+newtype PreNTProduct (p :: c -> c -> c)
+                     (f :: b -> ((c -> *) -> *))
+                     (g :: b -> ((c -> *) -> *))
+                     (x :: b)
+                     (cc :: (c -> *))
+    = PreNTProduct { getPreNTProduct :: (p <$> f x <*> g x) cc }
+
+preNTFanout :: (Products hom p) 
+            => (forall a b c. hom a b -> hom a c -> hom a (p b c)) 
+            -> PreNT hom a b -> PreNT hom a c -> PreNT hom a (PreNTProduct p b c)
+preNTFanout = unsafeCoerce
+
+preNTFst :: (Products hom p) => (forall a b. hom (p a b) a) -> PreNT hom (PreNTProduct p a b) a
+preNTFst = unsafeCoerce
+
+preNTSnd :: (Products hom p) => (forall a b. hom (p a b) b) -> PreNT hom (PreNTProduct p a b) b
+preNTSnd = unsafeCoerce
+
+instance (Products hom p) => Products (PreNT hom) (PreNTProduct p) where
+    (&&&) = preNTFanout (&&&)
+    fst = preNTFst fst
+    snd = preNTSnd snd
+
+type NTProduct p f g = PreNTProduct p (LiftF f) (LiftF g)
+
+
 {-
-newtype NT hom f g = NT (forall x. hom (f x) (g x))
-
-
-class Category hom => Products (hom :: k -> k -> *) where
-    type Product hom :: k -> k -> k
-    (&&&) :: hom a b -> hom a c -> hom a (Product hom b c)
-    fst :: hom (Product hom a b) a
-    snd :: hom (Product hom a b) b
-
 class Products hom => Arrows (hom :: k -> k -> *) where
     type Arrow hom :: k -> k -> k
     curry :: hom (Product hom a b) c -> hom a (Arrow hom b c)
