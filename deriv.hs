@@ -110,3 +110,28 @@ instance Functor t => Functor (D t a) where
     fmap f d = D { lseqL = lseqL d, cx = (fmap.fmap) f (cx d) }
 
 -- it fails at also being covariant in a.
+
+-- We can correct it by transforming a into an index set
+
+data D_1 t a b = forall ix. D_1 {
+    lseqL_1 :: forall f x. Functor f => t (ix + f x) -> f (t (ix + x)),
+    cx_1    :: t (ix + b),
+    index_1 :: ix -> a
+}
+
+-- Which is ugly as fuck, but it's covariant in both of its arguments.  I
+-- guess it makes sure that lseqL_1 can't change any a's along the way.
+
+-- Unfortunately, I don't think it captures what we are looking for.  We want
+-- the subset of functors t' of t such that t' (a + b) is linear in b; not that
+-- t (a + b) is linear in b for all of its values.  (I'm kinda glad, because I
+-- don't want the solution to be that ugly ass-thing).
+
+-- That is, 
+-- D t a (b + c) = D t a b + D t a c.   -- it's linear in the hole
+-- D t a a       = t a                  -- it's a one hole context
+--
+-- So,
+-- D t a (f a)  -> f (D t a a)            -- linearity
+--              =  f (t a)   
+
