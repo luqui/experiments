@@ -28,4 +28,5 @@ convert (Var i)    = foldr Then Proj2 (replicate i Proj1)
 convert (Lambda t) = Curry (convert t)    -- (X * a -> b) -> (X -> (a -> b))
 convert (App x y)  = Then (Bracket (convert x) (convert y)) (Uncurry Id)
 
-
+then' = flip (.)
+bracket f g x = (f x, g x)
