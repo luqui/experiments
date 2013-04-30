@@ -30,3 +30,16 @@ convert (App x y)  = Then (Bracket (convert x) (convert y)) (Uncurry Id)
 
 then' = flip (.)
 bracket f g x = (f x, g x)
+unit _ = ()
+
+-- e.g. convert (Lambda (Var 0) = Curry Proj2
+--                              = curry snd
+--
+-- To get from convert which has an environment to a pure morphism, uncurry then precompose with 
+-- bracket unit id
+--
+--   uncurry (curry snd) . bracket unit id    -- uncurry (curry f) = f
+-- = snd . bracket unit id                    -- snd . bracket f g = g
+-- = id
+--
+-- Next task is to write a simplifier that can do this.
