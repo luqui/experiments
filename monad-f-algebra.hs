@@ -72,12 +72,12 @@ nproduct f g = (f .* nfmap fstF) *** (g .* nfmap sndF)
 
 type MaybeIO = Maybe * IO
 
-readerIOAlg :: NAlgebra MonadF MaybeIO
-readerIOAlg = nproduct monadNAlgebra monadNAlgebra
+maybeIOAlg :: NAlgebra MonadF MaybeIO
+maybeIOAlg = nproduct monadNAlgebra monadNAlgebra
 
 instance Monad MaybeIO where
-    return = algReturn readerIOAlg
-    (>>=)  = flip (algBind readerIOAlg)
+    return = algReturn maybeIOAlg
+    (>>=)  = flip (algBind maybeIOAlg)
 
 -- It's really about two monadic computations sharing some structure.
 -- For example:
