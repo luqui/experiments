@@ -1,0 +1,36 @@
+F-Coalgebra `(A,f)`: `f : A -> F A`
+
+So, an F-Coalgebra morphism between `f` and `g` is a morphism `t : A -> B`, such that
+
+            f
+    A -----------> F A
+    |               |
+    |               |
+    | t             | F t
+    |               |
+    v       g       v
+    B -----------> F B
+
+commutes.  I.e. `t ; g = f ; F t`.
+
+Let's say `(A,f)` and `(B,g)` are instances of the classes `CA` and `CB`,
+respectively.  Then, is the existence of an F-coalgebra morphism `(A,f) ->
+(B,g)` equivalent to the subtype proposition `CA <: CB`?
+
+Well, we expect that however we can use a `CB`, we can use a `CA` in its place.
+So let's say we have a natural transformation `n : F -> G`, which represents
+something we do only using the observations of these objects (that's why it's
+natural). Then we expect that `f ; n_A ; G_t = t ; g ; n_B`.
+
+           f                 n_A
+    A ------------> F A -----------> G A
+    |                |                |
+    |                |                |
+    | t              | F t            | G t
+    |                |                |
+    v       g        v       n_B      v
+    B ------------> F B -----------> G B
+
+Yep!
+
+This doesn't yet account for observations-of-observations.
