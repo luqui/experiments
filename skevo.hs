@@ -144,10 +144,16 @@ printLn x = print x >> putStrLn ""
 main = do
     args <- getArgs
     case args of
-        [] -> runSim
+        [] -> runSim =<< Rand.evalRandIO (initialPool poolSize)
+        ["-f", f] -> do
+            cts <- readFile f
+            case mapM parseTerm (lines cts) of
+                Left err -> fail . show $ err
+                Right pool -> runSim pool
         [t] -> case parseTerm t of
                    Left err -> fail . show $ err
                    Right t' -> traceEval t'
+        _ -> fail "Invalid arguments"
 
 traceEval :: Term -> IO ()
 traceEval term = do
@@ -156,10 +162,7 @@ traceEval term = do
         Just term' -> traceEval term'
         Nothing    -> return ()
 
-runSim = do
-    IO.hSetBuffering IO.stdout IO.LineBuffering
-    pool <- Rand.evalRandIO (initialPool poolSize)
-    go pool
+runSim = go
     where
     go pool = do
         putStrLn "\o33[2J"
