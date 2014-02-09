@@ -4,43 +4,49 @@ open import Level
 
 data ⊥ {l} : Set l where
 
+data ⊤ {l} : Set l where
+  tt : ⊤
+
 _∘_ : {l : Level} {A B C : Set l} -> (B -> C) -> (A -> B) -> (A -> C)
 (g ∘ f) x = g (f x)
 
 id : {l : Level} {A : Set l} -> (A -> A)
 id x = x
 
-¬_ : {l : Level} (A : Set l) -> Set l
-¬_ {l} A = A -> ⊥ {l}
+¬_ : {l m : Level} (A : Set l) -> Set (l ⊔ m)
+¬_ {l} {m} A = A -> ⊥ {m}
 
 
 data _≡_ {l} {A : Set l} (x : A) : A -> Set l where
   refl : x ≡ x
 
-ap : {l m : Level} {A : Set l} (P : A -> Set m)
-         -> {x y : A} -> x ≡ y -> (P x -> P y)
-ap _ refl = id
+f-equal : {l m : Level} {A : Set l} {B : Set m} (f : A -> B) {x y : A}
+        -> x ≡ y -> f x ≡ f y
+f-equal _ refl = refl
+
+id-sym : {l : Level} {A : Set l} {x y : A} -> x ≡ y -> y ≡ x
+id-sym refl = refl
 
 postulate
   ex : {l m : Level} {A : Set l} {P : A -> Set m} {f g : (x : A) -> P x}
     -> ((x : A) -> f x ≡ g x) -> f ≡ g
 
-data Σ {l m} {A : Set l} (P : A -> Set m) : Set (l ⊔ m) where
-  _∥_ : (x : A) -> P x -> Σ P
-
-proj₁ : {l m : Level} {A : Set l} {P : A -> Set m} -> Σ P -> A
-proj₁ (x ∥ _) = x
+record Σ {l m} (A : Set l) (P : A -> Set m) : Set (l ⊔ m) where
+  constructor _∥_
+  field
+    proj₁ : A
+    proj₂ : P proj₁
 
 
 
 record isEquiv {l} (A B : Set l) (f : A -> B) : Set (suc l) where
   constructor isequiv
   field
-    inv-post : Σ (\g -> (g ∘ f) ≡ id)
-    inv-pre  : Σ (\g -> (f ∘ g) ≡ id)
+    inv-post : Σ (B -> A) (\g -> (g ∘ f) ≡ id)
+    inv-pre  : Σ (B -> A) (\g -> (f ∘ g) ≡ id)
 
 _≅_ : {l : Level} -> Set l -> Set l -> Set (suc l)
-A ≅ B = Σ (\f -> isEquiv A B f)
+A ≅ B = Σ (A -> B) (\f -> isEquiv A B f)
 
 ap-eqv : {l : Level} {A B : Set l} -> A ≅ B -> A -> B
 ap-eqv (f ∥ _) = f
@@ -52,11 +58,16 @@ transport : {l m : Level} {A : Set l} (P : A -> Set m)
           -> {x y : A} -> x ≡ y -> P x ≅ P y
 transport _ refl = id-eqv
 
+ap : {l m : Level} {A : Set l} (P : A -> Set m)
+         -> {x y : A} -> x ≡ y -> (P x -> P y)
+ap P p = Σ.proj₁ (transport P p)
+
+
 idtoeqv : {l : Level} {A B : Set l} -> (A ≡ B) -> (A ≅ B)
 idtoeqv = transport id
 
 lemma-isEquiv-unique-inverse : {l : Level} {A B : Set l} (f : A -> B) (eqv : isEquiv _ _ f)
-                            -> (proj₁ (isEquiv.inv-pre eqv) ≡ proj₁ (isEquiv.inv-post eqv))
+                            -> (Σ.proj₁ (isEquiv.inv-pre eqv) ≡ Σ.proj₁ (isEquiv.inv-post eqv))
 lemma-isEquiv-unique-inverse f (isequiv (g ∥ invg) (g' ∥ invg')) = α4
   where
   α1 : ((g ∘ f) ∘ g') ≡ (g ∘ (f ∘ g'))
@@ -71,22 +82,38 @@ lemma-isEquiv-unique-inverse f (isequiv (g ∥ invg) (g' ∥ invg')) = α4
 
 
 postulate
-  ua-axiom : {l : Level} {A B : Set l} -> isEquiv _ _ (idtoeqv {l} {A} {B})
+  ua-axiom : {l : Level} {A B : Set l} -> isEquiv (A ≡ B) (A ≅ B) idtoeqv
 
 ua : {l : Level} {A B : Set l} -> A ≅ B -> A ≡ B 
-ua {_} {A} {B} eqv with ua-axiom {_} {A} {B}
-...                   | isequiv (post ∥ _) _ = post eqv
+ua {_} {A} {B} eqv = Σ.proj₁ (isEquiv.inv-pre ua-axiom) eqv
 
+ua' : {l : Level} {A B : Set l} -> A ≅ B -> A ≡ B
+ua' {_} {A} {B} eqv = Σ.proj₁ (isEquiv.inv-post ua-axiom) eqv
+
+ua-ua'-id : {l : Level} {A B : Set l} -> ua {l} {A} {B} ≡ ua' {l} {A} {B}
+ua-ua'-id = lemma-isEquiv-unique-inverse _ ua-axiom
 
 lem-ua-compute : {l : Level} {A B : Set l} (f : A ≅ B) -> idtoeqv (ua f) ≡ f
-lem-ua-compute f = {!!}
+lem-ua-compute {l} {A} {B} f = f-equal (\k -> k f) inv-pre-id
+  where
+  inv-pre-id = Σ.proj₂ (isEquiv.inv-pre (ua-axiom {l} {A} {B})) 
 
 lem-ua-unique : {l : Level} {A B : Set l} (p : A ≡ B) -> p ≡ ua (idtoeqv p)
-lem-ua-unique p = {!!}
+lem-ua-unique {l} {A} {B} p = ap (\u -> p ≡ u (idtoeqv p)) (id-sym ua-ua'-id) 
+                              (f-equal (\k -> k p) inv-post-id)
+  where
+  inv-post-id = id-sym (Σ.proj₂ (isEquiv.inv-post (ua-axiom {l} {A} {B})))
 
 data Bool : Set where
   true : Bool
   false : Bool
+
+true-not-false : ¬ (true ≡ false)
+true-not-false p = ap comp p tt
+  where
+  comp : Bool -> Set
+  comp true = ⊤
+  comp false = ⊥
 
 negB : Bool -> Bool
 negB true = false
@@ -103,3 +130,14 @@ negB-eqv = negB ∥ isequiv (negB ∥ ex lemma-negB-self-inverse)
 negB-id : Bool ≡ Bool
 negB-id = ua negB-eqv
 
+negB-transport : ap (\bool -> bool) negB-id true ≡ false
+negB-transport = f-equal (\k -> Σ.proj₁ k true) (lem-ua-compute negB-eqv)
+
+idB-transport : ap (\bool -> bool) refl true ≡ true
+idB-transport = refl
+
+nontrivial-Bool-path : ¬ (negB-id ≡ refl)
+nontrivial-Bool-path p = true-not-false true-equals-false
+  where
+  negB-transport-sub = f-equal (\p' -> ap (\bool -> bool) p' true ≡ false) p
+  true-equals-false = ap id negB-transport-sub negB-transport
