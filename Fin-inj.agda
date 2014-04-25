@@ -1,4 +1,4 @@
-module wf where
+module Fin-inj where
 
 import Level
 open Level using (Level)
