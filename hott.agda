@@ -69,6 +69,9 @@ record isEquiv {l} (A B : Set l) (f : A -> B) : Set (lsuc l) where
 _≅_ : {l : Level} -> Set l -> Set l -> Set (lsuc l)
 A ≅ B = Σ (A -> B) (\f -> isEquiv A B f)
 
+isEquiv-set : {l : Level} {A B : Set l} {f : A -> B} (e e' : isEquiv A B f) -> e ≡ e'
+isEquiv-set {l} {A} {B} {f} (isequiv pre post) (isequiv pre' post') = {!!}
+
 ap-eqv : {l : Level} {A B : Set l} -> A ≅ B -> A -> B
 ap-eqv (f ∥ _) = f
 
