@@ -47,6 +47,12 @@ infixl 9 _•_
 _•_ : {l : Level} {A : Set l} {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
 refl • refl = refl
 
+•-left-cancel : {l : Level} {A : Set l} 
+              -> {x y z : A}
+              -> {p : x ≡ y} {q r : y ≡ z}
+              -> (p • q) ≡ (p • r) -> q ≡ r
+•-left-cancel {p = refl} {q = refl} {r = refl} = id
+
 
 postulate
   ex : {l m : Level} {A : Set l} {P : A -> Set m} {f g : (x : A) -> P x}
@@ -135,28 +141,6 @@ lem-ua-unique {l} {A} {B} p = ap (\u -> p ≡ u (idtoeqv p)) (id-sym ua-ua'-id)
   inv-post-id = id-sym (Σ.proj₂ (isEquiv.inv-post (ua-axiom {l} {A} {B})))
 
 
-module Eval {l : Level} where
-  data Functor : Set where
-    I : Functor
-    _⟶_ : Functor -> Functor -> Functor
-  
-  Interpret : Functor -> Set l -> Set l
-  Interpret I X = X
-  Interpret (F ⟶ G) X = Interpret F X -> Interpret G X
-
-  eqv-transport : (F : Functor) {X Y : Set l} -> (X ≅ Y) -> Interpret F X -> Interpret F Y
-  eqv-transport I eqv x = ap-eqv eqv x
-  eqv-transport (F ⟶ G) eqv f = 
-    eqv-transport G eqv ∘ f ∘ eqv-transport F (eqv-sym eqv)
-
-  trans : (F : Functor) {X Y : Set l} (eqv : X ≅ Y) (x : Interpret F X)
-        -> ap (Interpret F) (ua eqv) x ≡ eqv-transport F eqv x
-  trans I eqv x = f-equal (\f -> ap-eqv f x) (lem-ua-compute eqv)
-  trans (F ⟶ G) eqv f = {!!}
-    where 
-    transF = trans F (eqv-sym eqv)
-    transG = trans G eqv
-
 module Bool where
   data Bool : Set where
     true : Bool
@@ -200,3 +184,4 @@ module Bool where
   Bool-ind : (P : Bool -> Set) -> P true -> P false -> (x : Bool) -> P x
   Bool-ind _ t _ true = t
   Bool-ind _ _ f false = f
+
