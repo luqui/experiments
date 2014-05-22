@@ -28,7 +28,7 @@ data MF f b = forall s. MF (f s -> s) (s -> b)
 -- merge :: (Ord a) => [a] -> [a] -> [a] is structurally recursive in this way. 
 -- It should be easy to incrementally compute an update (prepend) to either list.
 
--- L2F a b c = [a] * [b] -> [c]
+-- L2F a b c = [a] * [b] -> c
 data L2F a b c = 
     forall s. L2F (LF b s)   -- left empty 
                   (LF a s)   -- right empty
@@ -55,3 +55,6 @@ have interesting tree (well, dag) structures.
 -- So L2F can be folded naively (like a tree) or smartly (like this dag).  It's
 -- up to the consumer, offering the possibility for more composable efficiency than
 -- before.
+--
+-- Now the questions are: how do we compute L2F from its components, and how do we
+-- make computing on the structure above easy/automatic?
