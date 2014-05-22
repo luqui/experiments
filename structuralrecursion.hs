@@ -67,13 +67,31 @@ have interesting tree (well, dag) structures.
 -- There is an analogy with computable reals somewhere here:
 
 {- 
-        |----------------------------------------|
-        |--------------A----------------|
-        |----------AA----------|            
-                  |---------AB----------|
-                  |----------------B-------------| 
-                  |---------BA----------|
-                               |--------BB-------|
+                           ε
+                     /     |     \
+                  A        B        C
+               /  |  \  /  |  \  /  |  \
+             AA  AB   AC   BB  BC   CB  CC
+                      BA       CA 
+
+each row:  n -> 2*n+1
+ 1, 3, 7, 15, 31,63
+
+= 2^n-1
+
+Which is also the number of nodes in a complete binary tree.
+So the positions at a given depth can be identified the nodes (not leaves) of a complete binary tree.
+
+                         BB
+                    /         \
+                  AB            CB
+               /     \       /     \
+             AA        AC  CA        CC
+
+Which can be expanded indefinitely, giving rise to binary.  BB = 0.1, AB = 0.01, CB = 0.11, ...
+
+Of course we can't represent it this way because each choice has an infinite amount of information.  
+
 -}
 
 data Interval a = a :.. a
