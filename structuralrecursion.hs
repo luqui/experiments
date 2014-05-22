@@ -58,3 +58,50 @@ have interesting tree (well, dag) structures.
 --
 -- Now the questions are: how do we compute L2F from its components, and how do we
 -- make computing on the structure above easy/automatic?
+--
+--
+-- If we can index the structure, i.e. find a type i such that each
+-- substructure has a corresponding i, then we can memoize i -> s in order to
+-- share intermediate computations.  In the above case, the index is (Int,Int).
+-- 
+-- There is an analogy with computable reals somewhere here:
+
+{- 
+        |----------------------------------------|
+        |--------------A----------------|
+        |----------AA----------|            
+                  |---------AB----------|
+                  |----------------B-------------| 
+                  |---------BA----------|
+                               |--------BB-------|
+-}
+
+data Interval a = a :.. a
+    deriving (Show)
+
+a,b,c :: Interval Rational
+a = 0 :.. (1/2)
+b = (1/4) :.. (3/4)
+c = (1/2) :.. 1
+
+
+instance (Ord a, Num a) => Num (Interval a) where
+    (x :.. x') + (y :.. y') = (x + y) :.. (x' + y')
+    negate (x :.. x')   = negate x' :.. negate x
+    (x :.. x') * (y :.. y') = minimum subs :.. maximum subs
+        where
+        subs = [x*y,x*y',x'*y,x'*y']
+    abs (x :.. y)
+        | x <= 0 && y <= 0 = negate (x :.. y)
+        | x <= 0 && y >= 0 = 0 :.. max (negate x) y
+        | x >= 0 && y >= 0 = x :.. y
+    signum (x :.. y)
+        | x <= 0 && y <= 0 = -1
+        | x <= 0 && y >= 0 = (-1) :.. 1
+        | x >= 0 && y >= 0 = 1
+    fromInteger x = fromInteger x :.. fromInteger x
+
+(|*|) :: (Num a) => Interval a -> Interval a -> Interval a
+(x :.. x') |*| (y :.. y') = (x+y*d) :.. (x+y'*d)
+    where
+    d = x' - x
