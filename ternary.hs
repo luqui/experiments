@@ -5,6 +5,7 @@ import Control.Applicative
 import Partial
 import Data.Glb (HasGlb(glb), flatGlb)
 import Data.Lub (HasLub(lub), flatLub)
+import Unsafe.Coerce (unsafeCoerce)
 
 data Place = H Place
 
@@ -105,3 +106,12 @@ withRef r cont = cont (Ref (renderApprox r . toApprox) (fromApprox . normalizeAp
         where
         r = f (1/4)
         cont s = fromApprox (\q -> 2*(f (q/2) - s))
+
+rat :: Ref p -> Rational -> Str p
+rat r = fromApprox r . const
+
+widen :: Str (H p) -> Str p
+widen = (T0 :>)
+
+halve :: Str p -> Str (H p)
+halve = unsafeCoerce
