@@ -2,10 +2,40 @@
 
 module Partial where
 
+import Control.Applicative
+import Control.Monad (ap)
 import Control.Arrow (second)
 import Data.Lub (HasLub(lub), flatLub)
 import Data.Glb (HasGlb(glb), glbs1, flatGlb)
 type Domain a = (HasLub a, HasGlb a)
+
+newtype FreeDomain a = FD { getFD :: forall b. Domain b => (a -> b) -> b }
+
+instance Functor FreeDomain where
+    fmap f fd = FD $ \c -> getFD fd (c . f)
+
+instance Applicative FreeDomain where
+    pure = return
+    (<*>) = ap
+
+instance Monad FreeDomain where
+    return x = FD $ \c -> c x
+    m >>= f = FD $ \c -> getFD m (\x -> getFD (f x) c)
+
+instance HasGlb (FreeDomain a) where
+    glb (FD f) (FD g) = FD (f `glb` g)
+
+instance HasLub (FreeDomain a) where
+    lub (FD f) (FD g) = FD (f `lub` g)
+
+down :: Int -> Int
+down 0 = 0
+down 1 = 0
+down 2 = 1
+down _ = 2
+
+
+
 
 newtype Partial a = Partial { partial :: forall b. Domain b => (a -> b) -> (a -> b) }
 
@@ -38,5 +68,7 @@ counit (Inc p x) = partial p id x
 -- costrong?
 squeezeR :: (Domain a, Domain b) => Inc (a,b) -> (a, Inc b)
 squeezeR = second unit . counit
+
+
 
 
