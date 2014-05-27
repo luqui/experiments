@@ -41,17 +41,21 @@ adder THalf THalf = (, return THalf)
 adder T1 T0 = (, return THalf)
 adder T1 T1 = (, return T1)
 
-adder T0 THalf = fst . addHalf &&& fmap (snd . addHalf) . t2
-adder THalf T0 = fst . addHalf &&& fmap (snd . addHalf) . t2
-adder THalf T1 = fst . addThreeHalves &&& fmap (snd . addThreeHalves) . t2
-adder T1 THalf = fst . addThreeHalves &&& fmap (snd . addThreeHalves) . t2
+adder T0 THalf = costrength . fmap addHalf . t2
+adder THalf T0 = costrength . fmap addHalf . t2
+adder THalf T1 = costrength . fmap addThreeHalves . t2
+adder T1 THalf = costrength . fmap addThreeHalves . t2
 
 adder' :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> (T2 (H p), FreeDomain (T2 p))
 adder' x y = runFD . fmap (adder x y)
 
 infixr 9 :>
 data Str p = T2 p :> Str (H p)
-    deriving (Show)
+
+instance Show (Str p) where
+    show (T0 :> xs) = 'A' : show xs
+    show (THalf :> xs) = 'B' : show xs
+    show (T1 :> xs) = 'C' : show xs
 
 instance HasGlb (Str p) where
     (x :> xs) `glb` (y :> ys) = (x `glb` y) :> (xs `glb` ys)

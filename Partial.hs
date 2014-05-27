@@ -39,3 +39,6 @@ down _ = 2
 
 test :: Int
 test = runFD $ down.down.down <$> foldr1 glb (map return [1..10])
+
+costrength :: (Domain a) => FreeDomain (a, b) -> (a, FreeDomain b)
+costrength fd = (runFD (fmap fst fd), fmap snd fd)
