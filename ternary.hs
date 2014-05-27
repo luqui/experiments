@@ -41,6 +41,8 @@ adder THalf THalf = (, return THalf)
 adder T1 T0 = (, return THalf)
 adder T1 T1 = (, return T1)
 
+-- otherwise we get *some* information about the out carry; i.e. it's either 
+-- T0 /\ THalf or THalf /\ T1.
 adder T0 THalf = costrength . fmap addHalf . t2
 adder THalf T0 = costrength . fmap addHalf . t2
 adder THalf T1 = costrength . fmap addThreeHalves . t2
