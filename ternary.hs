@@ -63,78 +63,45 @@ adderS (x :> xs) (y :> ys) = (xy :> xys, c')
     where
     (xys,c) = adderS xs ys
     (xy,c') = adder' x y c
- 
 
-{-
-data T2 = T0 | THalf | T1
-    deriving (Eq,Ord,Show)
-
-t2Value :: T2 -> Rational
-t2Value T0 = 0
-t2Value THalf = 1/2
-t2Value T1 = 1
-
-data T2Sum = TS0 | TSHalf | TS1 | TS1Half | TS2
-    deriving (Eq,Ord,Show)
-
-t2Sum :: T2 -> T2 -> T2Sum
-t2Sum T0 T0 = TS0
-t2Sum T0 THalf = TSHalf
-t2Sum T0 T1 = TS1
-t2Sum THalf T0 = TSHalf
-t2Sum THalf THalf = TS1
-t2Sum THalf T1 = TS1Half
-t2Sum T1 T0 = TS1
-t2Sum T1 THalf = TS1Half
-t2Sum T1 T1 = TS2
-
--- bool represents 0 or 1/2
-addCarry :: T2Sum -> Bool -> (T2, Bool)
-addCarry TS0 False     = (T0, False)
-addCarry TS0 True      = (T0, True)
-addCarry TSHalf False  = (T0, True)
-addCarry TSHalf True   = (THalf, False)
-addCarry TS1 False     = (THalf, False)
-addCarry TS1 True      = (THalf, True)
-addCarry TS1Half False = (THalf, True)
-addCarry TS1Half True  = (T1, False)
-addCarry TS2 False     = (T1, False)
-addCarry TS2 True      = (T1, True)
-
-
-
-add' :: [T2] -> [T2] -> Bool -> [T2]  -- wrong
-add' (x:xs) (y:ys) c = out : add' xs ys c'
+addS :: Str (H p) -> Str (H p) -> Str p
+addS x y = runFD c :> xy
     where
-    (out,c') = addCarry (t2Sum x y) c
+    (xy,c) = adderS x y
 
-add xs ys = add' xs ys False
 
-finiteApprox :: [T2] -> Rational
-finiteApprox = go (1/2)
+data Ref p = Ref {
+    toApprox :: Str p -> (Rational -> Rational),
+    fromApprox :: (Rational -> Rational) -> Str p
+}
+
+normalizeApprox :: (Rational, Rational) -> (Rational -> Rational) -> (Rational -> Rational)
+normalizeApprox (lo,hi) f = (/ (hi-lo)) . subtract lo . f . (* (hi-lo))
+
+renderApprox :: (Rational, Rational) -> (Rational -> Rational) -> (Rational -> Rational)
+renderApprox (lo,hi) f = (+lo) . (* (hi-lo))  . f . (/ (hi-lo))
+
+withRef :: (Rational, Rational) -> (forall p. Ref p -> z) -> z
+withRef r cont = cont (Ref (renderApprox r . toApprox) (fromApprox . normalizeApprox r))
     where
-    go !a [] = 0
-    go !a (x:xs) = a * (t2Value x) + go (a/2) xs
+    toApprox :: Str p -> (Rational -> Rational)
+    toApprox s thresh = go (1/2) s
+        where
+        go :: Rational -> Str p -> Rational
+        go err _ | 2*err < thresh = 0
+        go err (x :> xs) = err * t2Value x + go (err/2) xs
+        
+        t2Value :: T2 p -> Rational
+        t2Value T0 = 0
+        t2Value THalf = 1/2
+        t2Value T1 = 1
+        
 
-fromApprox :: (Rational -> Rational) -> [T2]
-fromApprox f
-    | r <= 1/4 = T0 : cont 0
-    | r >= 3/4 = T1 : cont (1/2)
-    | otherwise = THalf : cont (1/4)
-    where
-    r = f (1/4)
-    cont s = fromApprox (\q -> 2*(f (q/2) - s))
-
--- Halves a number (/ shifts it to a once-promoted position), smoothing out
--- T1s.  The resulting number will never have two T1s in a row, and will not
--- start with T1.
-smooth :: [T2] -> [T2]
-smooth = go False
-    where
-    go False (T1:xs)    = THalf : go False xs
-    go False (THalf:xs) = T0 : go True xs
-    go False (T0:xs)    = T0 : go False xs
-    go True  (T1:xs)    = T1 : go False xs
-    go True  (THalf:xs) = THalf : go True xs
-    go True  (T0:xs)    = THalf : go False xs
--}
+    fromApprox :: (Rational -> Rational) -> Str p
+    fromApprox f
+        | r <= 1/4 = T0 :> cont 0
+        | r >= 3/4 = T1 :> cont (1/2)
+        | otherwise = THalf :> cont (1/4)
+        where
+        r = f (1/4)
+        cont s = fromApprox (\q -> 2*(f (q/2) - s))
