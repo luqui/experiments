@@ -48,6 +48,9 @@ adder THalf T0 = costrength . fmap addHalf . t2
 adder THalf T1 = costrength . fmap addThreeHalves . t2
 adder T1 THalf = costrength . fmap addThreeHalves . t2
 
+-- There is a discontinuity here. When the inputs are THalf, T1, the carry never
+-- refines from THalf /\ T1 to a single value, and so e.g. 1/2 + 1 loops.
+
 adder' :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> (T2 (H p), FreeDomain (T2 p))
 adder' x y = runFD . fmap (adder x y)
 
