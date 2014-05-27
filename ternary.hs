@@ -1,7 +1,56 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, DataKinds, PolyKinds, ConstraintKinds, RankNTypes #-}
 
 import Control.Arrow
+import Control.Applicative
+import Partial
+import Data.Glb (HasGlb(glb), flatGlb)
+import Data.Lub (HasLub(lub), flatLub)
 
+data Place = H Place
+
+data T2 p = T0 | THalf | T1
+    deriving (Eq, Ord, Show)
+
+instance HasGlb (T2 p) where glb = flatGlb
+instance HasLub (T2 p) where lub = flatLub
+    
+-- if we know that the input is at least half, then we know snd of the output
+-- is THalf.
+addHalf :: T2 (H p) -> (T2 (H p), T2 p)
+addHalf T0    = (THalf, T0)
+addHalf THalf = (T1, T0)
+addHalf T1    = (THalf, THalf)
+
+addThreeHalves :: T2 (H p) -> (T2 (H p), T2 p)
+addThreeHalves T0 = (THalf, THalf)
+addThreeHalves THalf = (T1, THalf)
+addThreeHalves T1 = (THalf, T1)
+
+t2Dom :: [T2 p]
+t2Dom = [T0, THalf, T1]
+
+adder :: T2 (H p) -> T2 (H p) -> Inc (T2 (H p)) -> (T2 (H p), Inc (T2 p))
+-- When x and y add to an integer, we can compute the out carry without
+-- looking at the in carry.
+adder T0 T0 c = (counit c, unit T0)
+adder T0 T1 c = (counit c, unit THalf)
+adder THalf THalf c = (counit c, unit THalf)
+adder T1 T0 c = (counit c, unit THalf)
+adder T1 T1 c = (counit c, unit T1)
+
+adder T0 THalf c = squeezeR $ addHalf `mapInc` c
+adder THalf T0 c = squeezeR $ addHalf `mapInc` c
+adder THalf T1 c = squeezeR $ addThreeHalves `mapInc` c
+adder T1 THalf c = squeezeR $ addThreeHalves `mapInc` c 
+
+
+
+test = counit carry'
+    where
+    (y, carry') = adder T0 THalf (restrict t2Dom carry)
+    (x, carry) = adder T0 THalf (restrict t2Dom undefined)
+
+{-
 data T2 = T0 | THalf | T1
     deriving (Eq,Ord,Show)
 
@@ -73,3 +122,4 @@ smooth = go False
     go True  (T1:xs)    = T1 : go False xs
     go True  (THalf:xs) = THalf : go True xs
     go True  (T0:xs)    = THalf : go False xs
+-}
