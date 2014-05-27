@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, DataKinds, PolyKinds, ConstraintKinds, RankNTypes #-}
+{-# LANGUAGE BangPatterns, DataKinds, PolyKinds, ConstraintKinds, RankNTypes, TupleSections #-}
 
 import Control.Arrow
 import Control.Applicative
@@ -26,29 +26,41 @@ addThreeHalves T0 = (THalf, THalf)
 addThreeHalves THalf = (T1, THalf)
 addThreeHalves T1 = (THalf, T1)
 
-t2Dom :: [T2 p]
-t2Dom = [T0, THalf, T1]
+restrict :: [a] -> FreeDomain a -> FreeDomain a
+restrict xs = (foldr1 glb (map return xs) `lub`)
 
-adder :: T2 (H p) -> T2 (H p) -> Inc (T2 (H p)) -> (T2 (H p), Inc (T2 p))
+adder :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> FreeDomain (T2 (H p), T2 p)
 -- When x and y add to an integer, we can compute the out carry without
 -- looking at the in carry.
-adder T0 T0 c = (counit c, unit T0)
-adder T0 T1 c = (counit c, unit THalf)
-adder THalf THalf c = (counit c, unit THalf)
-adder T1 T0 c = (counit c, unit THalf)
-adder T1 T1 c = (counit c, unit T1)
+adder T0 T0 c = (, T0) <$> c
+adder T0 T1 c = (, THalf) <$> c
+adder THalf THalf c = (, THalf) <$> c
+adder T1 T0 c = (, THalf) <$> c
+adder T1 T1 c = (, T1) <$> c
 
-adder T0 THalf c = squeezeR $ addHalf `mapInc` c
-adder THalf T0 c = squeezeR $ addHalf `mapInc` c
-adder THalf T1 c = squeezeR $ addThreeHalves `mapInc` c
-adder T1 THalf c = squeezeR $ addThreeHalves `mapInc` c 
+adder T0 THalf c = addHalf <$> c
+adder THalf T0 c = addHalf <$> c
+adder THalf T1 c = addThreeHalves <$> c
+adder T1 THalf c = addThreeHalves <$> c
 
+adder' :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> FreeDomain (T2 (H p), T2 p)
+adder' x y =  adder x y . restrict [T0, THalf, T1]
 
+infixr 9 :>
+data Str p = T2 p :> Str (H p)
+    deriving (Show)
 
-test = counit carry'
-    where
-    (y, carry') = adder T0 THalf (restrict t2Dom carry)
-    (x, carry) = adder T0 THalf (restrict t2Dom undefined)
+instance HasGlb (Str p) where
+    (x :> xs) `glb` (y :> ys) = (x `glb` y) :> (xs `glb` ys)
+
+instance HasLub (Str p) where
+    (x :> xs) `lub` (y :> ys) = (x `lub` y) :> (xs `lub` ys)
+
+adderS :: Str (H p) -> Str (H p) -> FreeDomain (Str (H p), T2 p)
+adderS (x :> xs) (y :> ys) = do   
+    let (xys,c) = runFD $ adderS xs ys
+    let (xy,c') = runFD $ adder' x y (return c)
+    return (xy :> xys, c')
 
 {-
 data T2 = T0 | THalf | T1
