@@ -15,8 +15,8 @@ data T2 p = T0 | THalf | T1
 instance HasGlb (T2 p) where glb = flatGlb
 instance HasLub (T2 p) where lub = flatLub
     
--- if we know that the input is at least half, then we know snd of the output
--- is THalf.
+-- If we know the input is less than T1, then the out carry is T0.  This knowledge is
+-- captured by FreeDomain.
 addHalf :: T2 (H p) -> (T2 (H p), T2 p)
 addHalf T0    = (THalf, T0)
 addHalf THalf = (T1, T0)
