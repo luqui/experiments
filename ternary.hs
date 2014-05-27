@@ -29,22 +29,24 @@ addThreeHalves T1 = (THalf, T1)
 restrict :: [a] -> FreeDomain a -> FreeDomain a
 restrict xs = (foldr1 glb (map return xs) `lub`)
 
-adder :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> FreeDomain (T2 (H p), T2 p)
+t2 = restrict [T0, THalf, T1] . return
+
+adder :: T2 (H p) -> T2 (H p) -> T2 (H p) -> (T2 (H p), FreeDomain (T2 p))
 -- When x and y add to an integer, we can compute the out carry without
 -- looking at the in carry.
-adder T0 T0 c = (, T0) <$> c
-adder T0 T1 c = (, THalf) <$> c
-adder THalf THalf c = (, THalf) <$> c
-adder T1 T0 c = (, THalf) <$> c
-adder T1 T1 c = (, T1) <$> c
+adder T0 T0 = (, return T0)
+adder T0 T1 = (, return THalf) 
+adder THalf THalf = (, return THalf)
+adder T1 T0 = (, return THalf)
+adder T1 T1 = (, return T1)
 
-adder T0 THalf c = addHalf <$> c
-adder THalf T0 c = addHalf <$> c
-adder THalf T1 c = addThreeHalves <$> c
-adder T1 THalf c = addThreeHalves <$> c
+adder T0 THalf = fst . addHalf &&& fmap (snd . addHalf) . t2
+adder THalf T0 = fst . addHalf &&& fmap (snd . addHalf) . t2
+adder THalf T1 = fst . addThreeHalves &&& fmap (snd . addThreeHalves) . t2
+adder T1 THalf = fst . addThreeHalves &&& fmap (snd . addThreeHalves) . t2
 
-adder' :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> FreeDomain (T2 (H p), T2 p)
-adder' x y =  adder x y . restrict [T0, THalf, T1]
+adder' :: T2 (H p) -> T2 (H p) -> FreeDomain (T2 (H p)) -> (T2 (H p), FreeDomain (T2 p))
+adder' x y = runFD . fmap (adder x y)
 
 infixr 9 :>
 data Str p = T2 p :> Str (H p)
@@ -56,11 +58,12 @@ instance HasGlb (Str p) where
 instance HasLub (Str p) where
     (x :> xs) `lub` (y :> ys) = (x `lub` y) :> (xs `lub` ys)
 
-adderS :: Str (H p) -> Str (H p) -> FreeDomain (Str (H p), T2 p)
-adderS (x :> xs) (y :> ys) = do   
-    let (xys,c) = runFD $ adderS xs ys
-    let (xy,c') = runFD $ adder' x y (return c)
-    return (xy :> xys, c')
+adderS :: Str (H p) -> Str (H p) -> (Str (H p), FreeDomain (T2 p))
+adderS (x :> xs) (y :> ys) = (xy :> xys, c')
+    where
+    (xys,c) = adderS xs ys
+    (xy,c') = adder' x y c
+ 
 
 {-
 data T2 = T0 | THalf | T1

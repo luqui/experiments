@@ -3,7 +3,7 @@
 module Partial where
 
 import Control.Applicative
-import Control.Monad (ap)
+import Control.Monad (ap, liftM)
 import Control.Arrow (second)
 import Data.Lub (HasLub(lub), flatLub)
 import Data.Glb (HasGlb(glb), glbs1, flatGlb)
@@ -15,7 +15,7 @@ runFD :: (Domain a) => FreeDomain a -> a
 runFD fd = getFD fd id
 
 instance Functor FreeDomain where
-    fmap f fd = FD $ \c -> getFD fd (c . f)
+    fmap = liftM
 
 instance Applicative FreeDomain where
     pure = return
