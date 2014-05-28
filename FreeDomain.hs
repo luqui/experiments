@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ConstraintKinds #-}
 
-module Partial where
+module FreeDomain where
 
 import Control.Applicative
 import Control.Monad (ap, liftM)

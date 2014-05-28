@@ -2,7 +2,7 @@
 
 import Control.Arrow
 import Control.Applicative
-import Partial
+import FreeDomain
 import Data.Glb (HasGlb(glb), flatGlb)
 import Data.Lub (HasLub(lub), flatLub)
 import Unsafe.Coerce (unsafeCoerce)
