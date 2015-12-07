@@ -132,26 +132,32 @@ instance (ObserveBot a, ObserveBot b) => ObserveBot (a +> b) where
 
 -- LD-isomorphisms
 
-data Iso a b = Iso (a -> b) (b -> a)
+data a =~= b = Iso (a -> b) (b -> a)
 
-instance Category Iso where
+instance Category (=~=) where
     id = Iso id id
     Iso f g . Iso f' g' = Iso (f . f') (g' . g)
 
-inverse :: Iso a b -> Iso b a
+inverse :: a =~= b -> b =~= a
 inverse (Iso f g) = Iso g f
 
-(%) :: Iso a b -> a -> b
+(%) :: a =~= b -> a -> b
 Iso f _ % x = f x
 
 
-iso_N_SN :: Iso N (S N)
+iso_N_SN :: N =~= S N
 iso_N_SN = Iso S N
 
-iso_S_SigPlus :: Iso (S a) (Sigma +> a)
+iso_Plus_Assoc :: ((a +> b) +> c) =~= (a +> (b +> c))
+iso_Plus_Assoc = Iso forward backward
+    where
+    forward ~(Plus ~(Plus a b) c) = Plus a (Plus b c)
+    backward ~(Plus a ~(Plus b c)) = Plus (Plus a b) c
+
+iso_S_SigPlus :: S a =~= (Sigma +> a)
 iso_S_SigPlus = Iso (\(S x) -> inr x) (\(Plus a b) -> a `seq` S b)
 
-iso_NSig_FFN :: Iso (N +> Sigma) (Flip (Flip N))
+iso_NSig_FFN :: (N +> Sigma) =~= Flip (Flip N)
 iso_NSig_FFN = Iso forward backward
     where
     forward ~(Plus n sig) = Flip (\(Flip c) -> observeTop sig \/ c n)
