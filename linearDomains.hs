@@ -78,9 +78,11 @@ inward :: Omega -> Omega
 inward w = Omega (Flip (\(Omega (Flip f)) -> f w))
 
 
+-- Gives top only when input is top, otherwise bot
 class (LinearDomain a) => ObserveTop a where
     observeTop :: a -> Sigma
 
+-- Gives bot only when input is bot, otherwise top
 class (LinearDomain a) => ObserveBot a where
     observeBot :: a -> Sigma
 
