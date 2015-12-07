@@ -185,3 +185,38 @@ module Bool where
   Bool-ind _ t _ true = t
   Bool-ind _ _ f false = f
 
+
+module List (A : Set) where
+  data List : Set where
+    [] : List
+    _∷_ : A -> List -> List
+
+  Unfold : Set₁
+  Unfold = (B : Set) -> (A -> B -> B) -> B -> B
+
+  List-to-Unfold : List -> Unfold
+  List-to-Unfold [] _ _ nil = nil
+  List-to-Unfold (x ∷ xs) B cons nil = cons x (List-to-Unfold xs B cons nil)
+
+  Unfold-to-List : Unfold -> List
+  Unfold-to-List u = u List _∷_ []
+
+  List-to-Unfold-id : (xs : List) -> List-to-Unfold xs List _∷_ [] ≡ xs
+  List-to-Unfold-id [] = refl
+  List-to-Unfold-id (x ∷ xs) = f-equal (_∷_ x) (List-to-Unfold-id xs)
+
+  iso₁ : (xs : List) -> Unfold-to-List (List-to-Unfold xs) ≡ xs
+  iso₁ xs = List-to-Unfold-id xs
+
+  u-must-be-empty : (u : Unfold) -> u List _∷_ [] ≡ [] 
+                  -> (B : Set) (f : A -> B -> B) (z : B) -> u B f z ≡ z
+  u-must-be-empty u p B f z = {!!}
+
+  Unfold-to-List-id : (u : Unfold) (B : Set) (f : A -> B -> B) (z : B) 
+                   -> List-to-Unfold (Unfold-to-List u) B f z ≡ u B f z
+  Unfold-to-List-id u B f z with u List _∷_ []
+  ...                          | [] = {!!}
+  ...                          | (x ∷ xs) = {!!}
+
+  iso₂ : (u : Unfold) -> List-to-Unfold (Unfold-to-List u) ≡ u
+  iso₂ u = ex (\x -> ex (\f -> {!!}))
