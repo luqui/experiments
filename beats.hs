@@ -2,7 +2,7 @@
 
 import Control.Applicative hiding (empty)
 import Control.Concurrent (threadDelay, forkIO)
-import Control.Monad (replicateM, replicateM_, forever, join, forM_)
+import Control.Monad (replicateM, replicateM_, forever, join, forM_, filterM)
 import Data.IORef
 import Data.Monoid
 import qualified Data.Map as Map
@@ -86,16 +86,53 @@ printIFS (IFS start m) = do
     forM_ enumerate $ \a -> putStrLn $ show a ++ " -> " ++ show (m Map.! a)
     putStrLn $ "start = " ++ show start
 
-runIFS :: (RawBeat -> IO ()) -> IO ()
-runIFS beat = do
+evolveKernel :: (a -> a -> Rand.Rand Rand.StdGen a) -> (a -> Rand.Rand Rand.StdGen a) -> 
+                (a -> IO ()) -> [a] -> IO ()
+evolveKernel sex mutate shower pool = do
+    let poolsize = length pool
+    newpool <- flip filterM pool $ \l -> do
+        shower l
+        putStr $ "Good? "
+        answer <- getLine 
+        return $ answer == "y"
+    newelems <- Rand.evalRandIO . replicateM (poolsize - length newpool) $ do
+        boy <- Rand.uniform newpool
+        girl <- Rand.uniform newpool
+        sex boy girl
+    putStrLn "------------------------"
+    putStrLn "A NEW GENERATION IS BORN"
+    putStrLn "------------------------"
+    newelems' <- Rand.evalRandIO $ mapM mutate (newelems ++ newpool)
+    evolveKernel sex mutate shower newelems'
+
+ifsSex :: (Rand.RandomGen g, Ord a, Enumerate a) => IFS f a -> IFS f a -> Rand.Rand g (IFS f a)
+ifsSex (IFS boystart boy) (IFS girlstart girl) = do
+    newmap <- Map.fromList <$> mapM (\a -> (a,) <$> Rand.uniform [boy Map.! a, girl Map.! a]) enumerate
+    IFS <$> Rand.uniform [boystart, girlstart] <*> pure newmap
+
+ifsShow :: (RawBeat -> IO ()) -> IFS BeatF Nonterm -> IO ()
+ifsShow beat ifs = do
+    printIFS ifs
+    let expanded = expandIFSN 5 evalBeatF ifs 2
+    print expanded
+    beat expanded
+
+ifsMutate :: (GenRandom a, GenRandom (f a), Ord a, Rand.RandomGen g) => IFS f a -> Rand.Rand g (IFS f a) 
+ifsMutate (IFS start rules) = do
+    cancer <- genRandom
+    target <- genRandom
+    return $ IFS start (Map.insert cancer target rules)
+
+initialPool :: Int -> IO [IFS BeatF Nonterm]
+initialPool 0 = return []
+initialPool size = do
     ifs <- Rand.evalRandIO genRandom :: IO (IFS BeatF Nonterm)
     let expanded = expandIFSN 5 evalBeatF ifs 2
     if length expanded > 4 then do
-        printIFS ifs
-        print expanded
-        beat expanded
+        (ifs :) <$> initialPool (size-1)
     else
-        runIFS beat
+        initialPool size
+
 
 data RawItem = RawRest Double | RawNote Note Vel
     deriving (Show)
