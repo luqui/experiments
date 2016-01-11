@@ -2,6 +2,7 @@ import Control.Applicative
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Monad (replicateM, replicateM_, forever, join)
 import Data.IORef
+import Data.Monoid
 import qualified System.MIDI as MIDI
 import qualified Control.Monad.Random as Rand
 
@@ -33,6 +34,26 @@ instance GenRandom Beat where
            Concat <$> replicateM s (genRandom (d-1))
       ]
 
+
+data RawItem = RawRest Double | RawNote Note Vel
+    deriving (Show)
+type RawBeat = [RawItem]
+
+(+:) :: RawItem -> RawBeat -> RawBeat
+RawRest r +: [] = [RawRest r]
+RawRest r +: (RawRest r' : bs) = RawRest (r+r') : bs
+RawRest r +: (RawNote n v : bs) = RawRest r : RawNote n v : bs
+RawNote n v +: bs = RawNote n v : bs
+
+par :: RawBeat -> RawBeat -> RawBeat
+par [] bs = bs
+par as [] = as
+par (RawNote n v:as) bs = RawNote n v +: par as bs
+par as (RawNote n v:bs) = RawNote n v +: par as bs
+par (RawRest r:as) (RawRest r':bs)
+    | r <= r' = RawRest r +: par as (RawRest (r'-r):bs)
+    | otherwise = RawRest r' +: par (RawRest (r-r'):as) bs
+
 midiVel :: Vel -> Int
 midiVel (V v) = max 0 . min 127 $ floor (127*v)
 
@@ -49,18 +70,17 @@ playNote conn n v = do
 delay :: Double -> IO ()
 delay sec = threadDelay (floor (10^6 * sec))
 
-interp :: MIDI.Connection -> Double -> Beat -> IO ()
-interp conn tempo = go (4*60/tempo)
+interp :: MIDI.Connection -> RawBeat -> IO ()
+interp conn = mapM_ interp1
     where
-    go time Rest = delay time
-    go time (Note n v) = playNote conn n v >> delay time
-    go time (Concat bs) = mapM_ (go (time / fromIntegral (length bs))) bs
+    interp1 (RawRest r) = delay r
+    interp1 (RawNote n v) = playNote conn n v
 
-mkPlayer :: IO (Beat -> IO ())
+mkPlayer :: IO (RawBeat -> IO ())
 mkPlayer = do
     conn <- MIDI.openDestination =<< head <$> MIDI.enumerateDestinations
-    ref <- newIORef Rest
+    ref <- newIORef [RawRest 1]
     _ <- forkIO . forever $ do
         beat <- readIORef ref
-        interp conn 100 beat
+        interp conn beat
     return $ writeIORef ref
