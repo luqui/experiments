@@ -1,39 +1,101 @@
-import Control.Applicative
+{-# LANGUAGE DeriveFunctor, TupleSections, FlexibleContexts #-}
+
+import Control.Applicative hiding (empty)
 import Control.Concurrent (threadDelay, forkIO)
-import Control.Monad (replicateM, replicateM_, forever, join)
+import Control.Monad (replicateM, replicateM_, forever, join, forM_)
 import Data.IORef
 import Data.Monoid
+import qualified Data.Map as Map
 import qualified System.MIDI as MIDI
 import qualified Control.Monad.Random as Rand
 
 class GenRandom a where
-    genRandom :: (Rand.RandomGen g) => Int -> Rand.Rand g a
+    genRandom :: (Rand.RandomGen g) => Rand.Rand g a
 
+class Enumerate a where
+    enumerate :: [a]
 
+class Empty a where
+    empty :: a
+instance (Empty b) => Empty (a -> b) where
+    empty _ = empty
+instance Empty [a] where
+    empty = []
 
+data Nonterm = S Char
+    deriving (Eq, Ord, Show)
+instance Enumerate Nonterm where
+    enumerate = map S ['A'..'Z']
+instance GenRandom Nonterm where
+    genRandom = Rand.uniform enumerate
 
 newtype Note = N Int
     deriving (Show)
 instance GenRandom Note where
-    genRandom _ = N <$> Rand.uniform [0..7]
+    genRandom = N <$> Rand.uniform [0..7]
 
 newtype Vel = V Double
     deriving (Show)
 instance GenRandom Vel where
-    genRandom _ = V <$> Rand.getRandomR (0,1)
+    genRandom = V <$> Rand.getRandomR (0,1)
 
-data Beat 
+
+data BeatF a
     = Rest
     | Note Note Vel
-    | Concat [Beat]
-    deriving (Show)
-instance GenRandom Beat where
-    genRandom 0 = join $ Rand.uniform [pure Rest, Note <$> genRandom 0 <*> genRandom 0]
-    genRandom d = join $ Rand.uniform [
-        do s <- Rand.getRandomR (2,4)
-           Concat <$> replicateM s (genRandom (d-1))
+    | Concat [a]
+    | Parallel [a]
+    deriving (Show, Functor)
+
+instance Empty (BeatF a) where
+    empty = Rest
+
+instance (GenRandom a) => GenRandom (BeatF a) where
+    genRandom = join $ Rand.uniform [
+        pure Rest,
+        Note <$> genRandom <*> genRandom,
+        Rand.getRandomR (2,4) >>= \n -> Concat <$> replicateM n genRandom,
+        Parallel <$> replicateM 2 genRandom
       ]
 
+evalBeatF :: BeatF (Double -> RawBeat) -> Double -> RawBeat
+evalBeatF Rest sz = [RawRest sz]
+evalBeatF (Note n v) sz = [RawNote n v, RawRest sz]
+evalBeatF (Concat xs) sz = concatMap ($ sz / len) xs
+    where
+    len = fromIntegral (length xs)
+evalBeatF (Parallel xs) sz = foldr par [] (map ($ sz) xs)
+
+data IFS f a = IFS a (Map.Map a (f a))
+    deriving Show
+
+instance (GenRandom (f a), GenRandom a, Enumerate a, Ord a) => GenRandom (IFS f a) where
+    genRandom = IFS <$> genRandom <*> (Map.fromList <$> elems)
+        where
+        elems = mapM (\e -> (e,) <$> genRandom) enumerate
+
+fuseN :: (Functor f, Empty b) => Int -> (f b -> b) -> (a -> f a) -> (a -> b)
+fuseN 0 _ _ = const empty
+fuseN n alg coalg = alg . fmap (fuseN (n-1) alg coalg) . coalg
+
+expandIFSN :: (Ord a, Functor f, Empty b) => Int -> (f b -> b) -> IFS f a -> b
+expandIFSN n alg (IFS start m) = fuseN n alg (m Map.!) start
+
+printIFS :: (Show a, Show (f a), Enumerate a, Ord a) => IFS f a -> IO ()
+printIFS (IFS start m) = do
+    forM_ enumerate $ \a -> putStrLn $ show a ++ " -> " ++ show (m Map.! a)
+    putStrLn $ "start = " ++ show start
+
+runIFS :: (RawBeat -> IO ()) -> IO ()
+runIFS beat = do
+    ifs <- Rand.evalRandIO genRandom :: IO (IFS BeatF Nonterm)
+    let expanded = expandIFSN 5 evalBeatF ifs 2
+    if length expanded > 4 then do
+        printIFS ifs
+        print expanded
+        beat expanded
+    else
+        runIFS beat
 
 data RawItem = RawRest Double | RawNote Note Vel
     deriving (Show)
@@ -82,5 +144,5 @@ mkPlayer = do
     ref <- newIORef [RawRest 1]
     _ <- forkIO . forever $ do
         beat <- readIORef ref
-        interp conn beat
+        if null beat then delay 1 else interp conn beat
     return $ writeIORef ref
