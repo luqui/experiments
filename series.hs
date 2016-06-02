@@ -73,3 +73,8 @@ compose as bs = diag (lift2 (fmap . (*)) as (fromList (iterate (* bs) 1)))
 inverse :: (Fractional a) => Series a -> Series a
 -- Derivative of the inverse is the inverse of the derivative.
 inverse as = let s = integral 0 (1 / compose (deriv as) s) in s
+
+fixedPoint :: (Num a) => Series a -> Series a
+fixedPoint f = let g = 0 :+ (f `compose` g) in g
+
+-- g(x) = x f(g(x))  when x = 1
