@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, FlexibleContexts #-}
 
 import Data.Complex
 import Control.Applicative
@@ -48,29 +48,12 @@ rk4 d h y = y ^+^ (h/6) *^ (k1 ^+^ 2 *^ k2 ^+^ 2 *^ k3 ^+^ k4)
     k4 = d (y ^+^ h *^ k3)
 
 
--- Integrating with coefficients directly representing a_n
 transportd :: (VectorSpace a, Num (Scalar a)) => [a] -> [a]
 transportd = go 0
     where
     go n [] = []
     go n [a] = [a]
     go n (a:a':as) = ((n + 1) *^ a') : go (n+1) (a':as)
-
--- Coefficients representing log a_n
-logTransportd :: (Floating a) => [a] -> [a]
-logTransportd = go 0
-    where
-    go n [] = []
-    go n [b] = [b]
-    go n (b:b':bs) = ((n + 1) * exp (b' - b)) : go (n+1) (b':bs)
-
--- Coefficients representing a_n/n!
-factTransportd :: (VectorSpace a, Num (Scalar a)) => [a] -> [a]
-factTransportd = go 0
-    where
-    go n [] = []
-    go n [c] = [c]
-    go n (c:c':cs) = ((n + 1)^2 *^ c') : go (n+1) (c':cs)
     
 
 circlePath :: Int -> [C]
