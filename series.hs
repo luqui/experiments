@@ -74,7 +74,25 @@ inverse :: (Fractional a) => Series a -> Series a
 -- Derivative of the inverse is the inverse of the derivative.
 inverse as = let s = integral 0 (1 / compose (deriv as) s) in s
 
+-- `fixedPoint f` at 1 is a fixed point of f
 fixedPoint :: (Num a) => Series a -> Series a
 fixedPoint f = let g = 0 :+ (f `compose` g) in g
 
+-- Again, at 1
+root :: (Num a) => Series a -> Series a
+root f = fixedPoint (f+x)
+
 -- g(x) = x f(g(x))  when x = 1
+
+expS :: (Fractional a) => Series a
+expS = go 1 1
+    where
+    go n a = (1/a) :+ go (n+1) (a*n)
+
+sinS :: (Fractional a) => Series a
+sinS = go 0 1
+    where
+    go n a = 0 :+ (1/((n+1)*a)) :+ go (n+2) (-a*(n+1)*(n+2))
+
+cosS :: (Fractional a) => Series a
+cosS = deriv sinS

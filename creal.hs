@@ -28,5 +28,4 @@ transport c as =
     | i <- [0..] 
     ] 
 
-
-result = (.)
+main = mapM_ print . take 10 $ (transport (1/4) (transport (1/4) (repeat 1)) :: [CReal 32])
