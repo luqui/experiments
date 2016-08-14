@@ -11,7 +11,7 @@ Lemma trans : forall (X Y : Type), X = Y -> X -> Y.
  intros X Y p.
  destruct p.
  auto.
-Defined.
+Qed.
 
 
 Variable f : forall A : Type, A -> A -> A.
@@ -20,7 +20,7 @@ Hypothesis freef : forall (A B : Type) (x y : A) (g : A -> B),
 
 Lemma true_preserve : f True True = True.
   exact (eq_sym (freef True True (fun a => True))).
-Defined.
+Qed.
 
 Lemma f_prop_preserve_inh : forall A B : Prop, A -> B -> f A B.
  intros A B a b.
@@ -50,12 +50,6 @@ Qed.
 End monomorphic.
 
 
-
-(* Next challenge:
-
-   Prove that either (f = fun A x y => x) or (f = fun A x y = y)
-*)
-
 Section polymorphic.
 
 Definition fType := forall A : Type, A -> A -> A.
@@ -67,7 +61,6 @@ Lemma abstract1 : forall (ff : fType), (forall (A : Type) (x y : A), ff A x y = 
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
- unfold proj1.
  apply H.
 Qed.
 
@@ -76,7 +69,6 @@ Lemma abstract2 : forall (ff : fType), (forall (A : Type) (x y : A), ff A x y = 
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
  apply FunctionalExtensionality.functional_extensionality_dep ; intro.
- unfold proj1.
  apply H.
 Qed.
 
