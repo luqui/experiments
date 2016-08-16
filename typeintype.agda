@@ -7,7 +7,6 @@ module typeintype where
 open import Data.Empty
 open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality
-open import Data.Bool
 
 data Value : Set where
   mkValue : (A : Set) -> A -> Value
