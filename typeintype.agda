@@ -9,31 +9,37 @@ open import Relation.Nullary
 open import Relation.Binary.PropositionalEquality
 open import Data.Bool
 
-data Type : Set where
-  mkType : (A : Set) -> A -> Type
+data Value : Set where
+  mkValue : (A : Set) -> A -> Value
+
+valType : Value -> Set
+valType (mkValue t _) = t
+
+valValue : (v : Value) -> valType v
+valValue (mkValue _ v) = v
 
 transport : {A B : Set} -> A ≡ B -> A -> B
 transport refl x = x
 
-record CompMember (A : Set) (a : A) (t : Type) : Set where
+-- "v ∈ s" encodes the predicate that s is a set-comprehension-style value
+-- (i.e. Value -> Set) and that it contains v.  If s is any other kind of value, 
+-- this is uninhabited.
+record _∈_ (v : Value) (s : Value) : Set where
   field
-    a-comprehension-type : A ≡ (Type -> Set)
-    t-in-a : transport a-comprehension-type a t
+    a-comprehension : valType s ≡ (Value -> Set)
+    t-in-a : transport a-comprehension (valValue s) v
 
-selfMember : Type -> Set
-selfMember (mkType A a) = CompMember A a (mkType A a)
+selfMember : Value -> Set
+selfMember t = t ∈ t
 
-notSelfMember : Type -> Set
-notSelfMember t = ¬ (selfMember t)
-
-russell : Type
-russell = mkType (Type -> Set) notSelfMember
+russell : Value
+russell = mkValue (Value -> Set) (\t -> ¬ (selfMember t))
 
 russell-q-1 : selfMember russell -> ¬ (selfMember russell) 
-russell-q-1 record { a-comprehension-type = refl ; t-in-a = t-in-a } t = t-in-a t
+russell-q-1 record { a-comprehension = refl ; t-in-a = t-in-a } t = t-in-a t
 
 russell-q-2 : ¬ (selfMember russell) -> selfMember russell
-russell-q-2 f = record { a-comprehension-type = refl ; t-in-a = f }
+russell-q-2 f = record { a-comprehension = refl ; t-in-a = f }
 
 implyFalsity : {A : Set} -> (A -> ¬ A) -> ¬ A
 implyFalsity f a = f a a
