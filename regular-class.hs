@@ -1,24 +1,26 @@
-{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction #-}
+{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds #-}
 
 import qualified Prelude
-import Prelude hiding (Num(..), Monoid(..))
+import Prelude hiding (Num(..), Monoid(..), Functor(..))
 
-type Algebra f a = f a -> a
+class Endofunctor f where
+    type Cat f :: k -> k -> *
+    fmap :: Cat f a b -> Cat f (f a) (f b)
 
-class (Functor f) => Reg f a where
-    reg :: Algebra f a
+class (Endofunctor f) => Reg f a where
+    reg :: Cat f (f a) a
 
-instance (Reg f a, Reg f b) => Reg f (a,b) where
+instance (Reg f a, Reg f b, Cat f ~ (->)) => Reg f (a,b) where
     reg f = (reg (fmap fst f), reg (fmap snd f))
 
 
-reg0 :: (Reg f a) => f a -> a
+reg0 :: (Reg f a, Cat f ~ (->)) => f a -> a
 reg0 f = reg f
 
-reg1 :: (Reg f b) => (a -> f b) -> a -> b
+reg1 :: (Reg f b, Cat f ~ (->)) => (a -> f b) -> a -> b
 reg1 f x = reg (f x)
 
-reg2 :: (Reg f c) => (a -> b -> f c) -> a -> b -> c
+reg2 :: (Reg f c, Cat f ~ (->)) => (a -> b -> f c) -> a -> b -> c
 reg2 f x y = reg (f x y)
 
 data NumF a
@@ -29,7 +31,11 @@ data NumF a
     | Times a a
     | Abs a
     | SigNum a
-    deriving (Functor)
+    deriving (Prelude.Functor)
+
+instance Endofunctor NumF where
+    type Cat NumF = (->)
+    fmap = Prelude.fmap
 
 type Num = Reg NumF
 
@@ -54,7 +60,11 @@ instance Reg NumF Integer where
 data MonoidF a
     = MEmpty
     | MAppend a a
-    deriving (Functor)
+    deriving (Prelude.Functor)
+
+instance Endofunctor MonoidF where
+    type Cat MonoidF = (->)
+    fmap = Prelude.fmap
 
 type Monoid = Reg MonoidF
 
