@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds, RankNTypes, TypeOperators, GADTs, LambdaCase #-}
+{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds, RankNTypes, TypeOperators, GADTs, LambdaCase, KindSignatures, AllowAmbiguousTypes #-}
 
 import qualified Prelude
 import Prelude hiding (Num(..), Monoid(..), Functor(..))
@@ -75,23 +75,44 @@ instance Reg MonoidF [a] where
     reg MEmpty = []
     reg (MAppend x y) = x ++ y
 
--- Now let's get high
+-- ghci> mappend ("a", "b") ("c", "d")
+-- ("ac", "bd")
 
-newtype f ~> g = Nat { appNat :: forall x. f x -> g x }
+-- Now let's get high
+-- It seems we cannot go up to arbitrary kinds, because polykinds and type equality
+-- don't interact in the most friendly way in current GHC, so we resort to just one
+-- level up :(.
+
+newtype (f :: * -> *) ~> (g :: * -> *) = Nat { (%) :: forall x. f x -> g x }
 
 data FunctorF :: (* -> *) -> (* -> *) where
     FMap :: (a -> b) -> f a -> FunctorF f b
 
 instance Endofunctor FunctorF where
     type Cat FunctorF = (~>)
-    fmap f = Nat $ \(FMap t a) -> FMap t (appNat f a)
+    fmap f = Nat $ \(FMap t a) -> FMap t (f % a)
 
 type Functor = Reg FunctorF
 
 fmap' :: (Functor f) => (a -> b) -> (f a -> f b)
-fmap' f x = appNat reg (FMap f x)
+fmap' f x = reg % FMap f x
 
 instance Reg FunctorF Maybe where
     reg = Nat $ \case
         FMap f Nothing -> Nothing
         FMap f (Just x) -> Just (f x)
+
+data ((a :: * -> *) * (b :: * -> *)) x = Pair (a x) (b x)
+    deriving Show
+
+gfst :: a * b ~> a
+gfst = Nat $ \(Pair x _) -> x
+
+gsnd :: a * b ~> b
+gsnd = Nat $ \(Pair _ y) -> y
+
+instance (Cat f ~ (~>), Reg f a, Reg f b) => Reg f (a * b) where
+    reg = Nat $ \f -> Pair (reg % (fmap gfst % f)) (reg % (fmap gsnd % f))    
+
+-- ghci> fmap' not (Pair (Just False) (Just True))
+-- Pair (Just True) (Just False)
