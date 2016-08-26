@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds, RankNTypes, TypeOperators, GADTs, LambdaCase #-}
 
 import qualified Prelude
 import Prelude hiding (Num(..), Monoid(..), Functor(..))
@@ -75,3 +75,23 @@ instance Reg MonoidF [a] where
     reg MEmpty = []
     reg (MAppend x y) = x ++ y
 
+-- Now let's get high
+
+newtype f ~> g = Nat { appNat :: forall x. f x -> g x }
+
+data FunctorF :: (* -> *) -> (* -> *) where
+    FMap :: (a -> b) -> f a -> FunctorF f b
+
+instance Endofunctor FunctorF where
+    type Cat FunctorF = (~>)
+    fmap f = Nat $ \(FMap t a) -> FMap t (appNat f a)
+
+type Functor = Reg FunctorF
+
+fmap' :: (Functor f) => (a -> b) -> (f a -> f b)
+fmap' f x = appNat reg (FMap f x)
+
+instance Reg FunctorF Maybe where
+    reg = Nat $ \case
+        FMap f Nothing -> Nothing
+        FMap f (Just x) -> Just (f x)
