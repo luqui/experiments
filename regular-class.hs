@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds, DeriveFunctor, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, NoMonomorphismRestriction, TypeFamilies, PolyKinds, RankNTypes, TypeOperators, GADTs, LambdaCase, KindSignatures, AllowAmbiguousTypes #-}
 
 import qualified Prelude
-import Prelude hiding (Num(..), Monoid(..), Functor(..))
+import Prelude hiding (Num(..), Monoid(..), Functor(..), Applicative(..))
 
 class Endofunctor f where
     type Cat f :: k -> k -> *
@@ -98,9 +98,7 @@ fmap' :: (Functor f) => (a -> b) -> (f a -> f b)
 fmap' f x = reg % FMap f x
 
 instance Reg FunctorF Maybe where
-    reg = Nat $ \case
-        FMap f Nothing -> Nothing
-        FMap f (Just x) -> Just (f x)
+    reg = Nat $ \(FMap f x) -> Prelude.fmap f x
 
 data ((a :: * -> *) * (b :: * -> *)) x = Pair (a x) (b x)
     deriving Show
@@ -116,3 +114,30 @@ instance (Cat f ~ (~>), Reg f a, Reg f b) => Reg f (a * b) where
 
 -- ghci> fmap' not (Pair (Just False) (Just True))
 -- Pair (Just True) (Just False)
+
+
+data ApplicativeF :: (* -> *) -> (* -> *) where
+    ApplicativeIsFunctor :: FunctorF f a -> ApplicativeF f a
+    Pure :: a -> ApplicativeF f a
+    Ap :: f (a -> b) -> f a -> ApplicativeF f b
+
+type Applicative = Reg ApplicativeF
+
+instance Endofunctor ApplicativeF where
+    type Cat ApplicativeF = (~>)
+    fmap f = Nat $ \case
+        ApplicativeIsFunctor functor -> ApplicativeIsFunctor (fmap f % functor)
+        Pure x -> Pure x
+        Ap t x -> Ap (f % t) (f % x)
+
+pure :: (Applicative f) => a -> f a
+pure x = reg % Pure x
+
+(<*>) :: (Applicative f) => f (a -> b) -> f a -> f b
+f <*> x = reg % Ap f x
+
+instance Reg ApplicativeF Maybe where
+    reg = Nat $ \case 
+        ApplicativeIsFunctor functor -> reg % functor
+        Pure x -> Prelude.pure x
+        Ap t x -> t Prelude.<*> x
