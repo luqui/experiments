@@ -5,6 +5,9 @@ module hott-model where
 open import Relation.Binary.PropositionalEquality
 open ≡-Reasoning
 
+postulate
+  Π-= : {A : Set} {F : A -> Set} {f g : (x : A) -> F x} -> ((x : A) -> f x ≡ g x) -> f ≡ g
+
 record Σ (A : Set) (F : A -> Set) : Set where
   constructor _,_
   field
@@ -48,6 +51,9 @@ _∘_ : {A B C : Set} -> (B -> C) -> (A -> B) -> A -> C
 subst-cong : {A B : Set} {F : B -> Set} {g : A -> B} {x y : A} {p : x ≡ y} {body : F (g x)} -> subst (F ∘ g) p body ≡ subst F (cong g p) body
 subst-cong {p = refl} = refl
 
+cong-sym-commute : {A B : Set} {f : A -> B} {x y : A} {p : x ≡ y} -> cong f (sym p) ≡ sym (cong f p)
+cong-sym-commute {p = refl} = refl
+
 -- Can't do this shit in HoTT.  What a load off.
 ≡-mere-prop : {A : Set} {x y : A} {p q : x ≡ y} -> p ≡ q
 ≡-mere-prop {p = refl} {q = refl} = refl
@@ -84,8 +90,40 @@ Eqv.g-f (Σ-respects-Eqv e {F = F}) (a , x) = Σ-≡ (Eqv.g-f e a) (mkEqOver (
    ∎))
 
 
+fn-dep-≡ : {A : Set} {F : A -> Set} (f : (x : A) -> F x) {a b : A} (p : a ≡ b) -> subst F p (f a) ≡ f b
+fn-dep-≡ f refl = refl
+
 Π-respects-Eqv : {A B : Set} (e : A ≃ B) {F : A -> Set} -> Π A F ≃ Π B (F ∘ Eqv.g e)
-Eqv.f (Π-respects-Eqv e {F = F}) f b = {!!}
-Eqv.g (Π-respects-Eqv e {F = F}) f a = {!!}
-Eqv.f-g (Π-respects-Eqv e {F = F}) f = {!!}
-Eqv.g-f (Π-respects-Eqv e {F = F}) f = {!!}
+Eqv.f (Π-respects-Eqv e {F = F}) t b = t (Eqv.g e b)
+Eqv.g (Π-respects-Eqv e {F = F}) t a = subst F (Eqv.g-f e a) (t (Eqv.f e a))
+Eqv.f-g (Π-respects-Eqv e {F = F}) t = Π-= (\b -> 
+   let pfx = subst F (Eqv.g-f e (Eqv.g e b)) in
+   begin
+     subst F (Eqv.g-f e (Eqv.g e b)) (t (Eqv.f e (Eqv.g e b)))
+       ≡⟨ cong pfx (sym (fn-dep-≡ t (sym (Eqv.f-g e b)))) ⟩
+     subst F (Eqv.g-f e (Eqv.g e b)) (subst (F ∘ Eqv.g e) (sym (Eqv.f-g e b)) (t b))
+       ≡⟨ cong pfx (subst-cong {p = sym (Eqv.f-g e b)}) ⟩
+     subst F (Eqv.g-f e (Eqv.g e b)) (subst F (cong (Eqv.g e) (sym (Eqv.f-g e b))) (t b))
+       ≡⟨ cong (\ ◼ -> pfx (subst F ◼ (t b))) (cong-sym-commute {p = Eqv.f-g e b})  ⟩
+     subst F (Eqv.g-f e (Eqv.g e b)) (subst F (sym (cong (Eqv.g e) (Eqv.f-g e b))) (t b))
+       ≡⟨ cong (\ ◼ -> pfx (subst F (sym ◼) (t b))) (eqv-cong-g' {e = e}) ⟩
+     subst F (Eqv.g-f e (Eqv.g e b)) (subst F (sym (Eqv.g-f e (Eqv.g e b))) (t b))
+       ≡⟨ subst-concat {p = Eqv.g-f e (Eqv.g e b)} {q = sym (Eqv.g-f e (Eqv.g e b))} ⟩
+     subst F (sym (Eqv.g-f e (Eqv.g e b)) ∙ Eqv.g-f e (Eqv.g e b)) (t b)
+       ≡⟨ cong (\ ■ -> subst F ■ (t b)) (sym-id-refl (Eqv.g-f e (Eqv.g e b))) ⟩
+     subst F refl (t b)
+       ≡⟨ refl ⟩
+     t b
+   ∎)
+Eqv.g-f (Π-respects-Eqv e {F = F}) t = Π-= (\a -> 
+   begin
+     subst F (Eqv.g-f e a) (t (Eqv.g e (Eqv.f e a)))
+        ≡⟨ cong (subst F (Eqv.g-f e a)) (sym (fn-dep-≡ t (sym (Eqv.g-f e a)))) ⟩
+     subst F (Eqv.g-f e a) (subst F (sym (Eqv.g-f e a)) (t a))
+        ≡⟨ subst-concat {p = Eqv.g-f e a} {q = sym (Eqv.g-f e a)} ⟩
+     subst F (sym (Eqv.g-f e a) ∙ Eqv.g-f e a) (t a) 
+        ≡⟨ cong (\p -> subst F p (t a)) (sym-id-refl (Eqv.g-f e a)) ⟩
+     subst F refl (t a)
+        ≡⟨ refl ⟩
+     t a
+   ∎)
