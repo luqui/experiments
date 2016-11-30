@@ -6,16 +6,6 @@ data KindTree
     = Set
     | KindTree :->: KindTree
 
--- Cool thing, reify a KindTree into a lifted kind (k -> *) -> *.
-newtype Id a = Id a
-
-newtype KArr k k' a = KArr (k a -> k' a)
-
-type family Reify (kt :: KindTree) :: k -> * where
-    Reify Set = Id
-    Reify (k :->: k') = KArr (Reify k) (Reify k')
-
-
 -- Eq1 for greater values of 1.
 -- TODO, implement it as a class using Data.Constraint.
 newtype Eq0 a = Eq0 { eq0 :: a -> a -> Bool }
