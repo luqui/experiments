@@ -1,6 +1,7 @@
-{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, TypeOperators, KindSignatures, ConstraintKinds, RankNTypes, MultiParamTypeClasses, UndecidableInstances, ScopedTypeVariables, FunctionalDependencies, FlexibleInstances #-}
+{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, TypeOperators, KindSignatures, ConstraintKinds, RankNTypes, MultiParamTypeClasses, UndecidableInstances, ScopedTypeVariables, FunctionalDependencies, FlexibleInstances, FlexibleContexts #-}
 
 import Data.Constraint
+import Data.Constraint.Forall
 import Data.Proxy
 
 data KindTree
@@ -8,7 +9,6 @@ data KindTree
     | KindTree :->: KindTree
 
 -- Eq1 for greater values of 1.
--- TODO, implement it as a class using Data.Constraint.
 newtype Eq0 a = Eq0 { eq0 :: a -> a -> Bool }
 
 newtype Eqk kt kt' f = Eqk { eqk :: forall a. Eqn kt a -> Eqn kt' (f a) }
@@ -28,22 +28,26 @@ eqMaybe = Eqk (\eqa -> Eq0 (\m m' ->
         _ -> False))
 
 
+-- Here it is with classes.  Pretty neat, though the Eq (Mu f) instance is pretty messy
+-- with all the type hints, and also brittle as to which type hints work and which don't.
+class (EqnC kt a :=> EqnC kt' (f a)) => EqkCHelper kt kt' f a
+instance (EqnC kt a :=> EqnC kt' (f a)) => EqkCHelper kt kt' f a
 
-
-class EqkC kt kt' f | f -> kt kt'  where
-    eqkC :: Proxy f -> Proxy a -> EqnC kt a :- EqnC kt' (f a)
+class (Forall (EqkCHelper kt kt' f)) => EqkC kt kt' f
+instance (Forall (EqkCHelper kt kt' f)) => EqkC kt kt' f
 
 type family EqnC (kt :: KindTree) :: k -> Constraint where
     EqnC Set = Eq
     EqnC (kt :->: kt') = EqkC kt kt'
-
-instance EqkC Set Set Maybe where eqkC _ _ = Sub Dict
 
 
 newtype Mu f = Roll { unroll :: f (Mu f) }
 
 instance EqnC (Set :->: Set) f => Eq (Mu f) where
     Roll x == Roll y
-        | Sub Dict <- eqkC (Proxy :: Proxy f) (Proxy :: Proxy (Mu f)) = x == y
+        -- I'd like to say inst :: EqnC (Set :->: Set) f :- ..., but GHC rejects this.
+        | Sub Dict <- (inst :: Forall (EqkCHelper Set Set f) :- EqkCHelper Set Set f (Mu f)) 
+        , Sub Dict <- (ins :: Eq (Mu f) :- Eq (f (Mu f)))
+            = x == y
 
-instance EqkC (Set :->: Set) Set Mu where eqkC _ _ = Sub Dict
+
