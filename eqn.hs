@@ -30,6 +30,8 @@ eqMaybe = Eqk (\eqa -> Eq0 (\m m' ->
 
 -- Here it is with classes.  Pretty neat, though the Eq (Mu f) instance is pretty messy
 -- with all the type hints, and also brittle as to which type hints work and which don't.
+-- But it's pretty cool that the complexity is at the use site, and we don't need any
+-- boilerplate to specify that something is Eqn beyond the actual instance existing.
 class (EqnC kt a :=> EqnC kt' (f a)) => EqkCHelper kt kt' f a
 instance (EqnC kt a :=> EqnC kt' (f a)) => EqkCHelper kt kt' f a
 
