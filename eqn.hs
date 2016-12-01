@@ -1,6 +1,7 @@
-{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, TypeOperators, KindSignatures, ConstraintKinds, RankNTypes #-}
+{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, TypeOperators, KindSignatures, ConstraintKinds, RankNTypes, MultiParamTypeClasses, UndecidableInstances, ScopedTypeVariables, FunctionalDependencies, FlexibleInstances #-}
 
 import Data.Constraint
+import Data.Proxy
 
 data KindTree
     = Set
@@ -25,3 +26,24 @@ eqMaybe = Eqk (\eqa -> Eq0 (\m m' ->
         (Just x, Just y) -> eq0 eqa x y
         (Nothing, Nothing) -> True
         _ -> False))
+
+
+
+
+class EqkC kt kt' f | f -> kt kt'  where
+    eqkC :: Proxy f -> Proxy a -> EqnC kt a :- EqnC kt' (f a)
+
+type family EqnC (kt :: KindTree) :: k -> Constraint where
+    EqnC Set = Eq
+    EqnC (kt :->: kt') = EqkC kt kt'
+
+instance EqkC Set Set Maybe where eqkC _ _ = Sub Dict
+
+
+newtype Mu f = Roll { unroll :: f (Mu f) }
+
+instance EqnC (Set :->: Set) f => Eq (Mu f) where
+    Roll x == Roll y
+        | Sub Dict <- eqkC (Proxy :: Proxy f) (Proxy :: Proxy (Mu f)) = x == y
+
+instance EqkC (Set :->: Set) Set Mu where eqkC _ _ = Sub Dict
