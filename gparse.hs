@@ -4,20 +4,20 @@ import Data.Constraint (Constraint)
 import qualified Text.ParserCombinators.ReadP as ReadP
 import Text.ParserCombinators.ReadP (ReadP)
 
-type family Map f xs :: Constraint where
-    Map f '[] = ()
-    Map f (x ': xs) = (f x, Map f xs)
+type family All f xs :: Constraint where
+    All f '[] = ()
+    All f (x ': xs) = (f x, All f xs)
 
 data Proxy a = Proxy
 
-class Map c (InnerTypes a) => GParse c a where
+class All c (InnerTypes a) => GParse c a where
     type InnerTypes a :: [*]
     gparse :: (Applicative f) => Proxy c -> (forall x. c x => f x) -> f a
 
 data Foo = Foo Bool Int String 
     deriving Show
 
-instance Map c (InnerTypes Foo) => GParse c Foo where
+instance All c (InnerTypes Foo) => GParse c Foo where
     type InnerTypes Foo = '[Bool, Int, String]
     gparse _ r = Foo <$> r <*> r <*> r
 
