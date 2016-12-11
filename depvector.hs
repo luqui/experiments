@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeInType, GADTs, TypeOperators, RankNTypes, TypeFamilies, UndecidableInstances, TypeApplications, ScopedTypeVariables, AllowAmbiguousTypes, NoMonomorphismRestriction #-}
 
 import Data.Kind (Type)
+import Data.Foldable (toList)
+import Debug.Trace
 
 data (==) :: forall a. a -> a -> Type where
     Refl :: x == x
@@ -18,6 +20,7 @@ transport Refl = id
 data Nat :: Type where
     Zero :: Nat
     Suc :: Nat -> Nat
+    deriving (Show)
 
 type family (+) a b :: Nat where
     'Zero + b = b
@@ -34,7 +37,7 @@ plusZeroRight = getPZR_Recursor $ natRec base inductive
     base :: PZR_Recursor 'Zero
     base = PZR_Recursor Refl
     inductive :: PZR_Recursor n -> PZR_Recursor ('Suc n)
-    inductive (PZR_Recursor Refl) = PZR_Recursor Refl
+    inductive (PZR_Recursor Refl) = trace "PZR" $ PZR_Recursor Refl
 newtype PZR_Recursor n = PZR_Recursor { getPZR_Recursor :: (n + 'Zero) == n }
 
 plusSucRight :: forall m n. IsNat n => (n + 'Suc m) == 'Suc (n + m) 
@@ -43,7 +46,7 @@ plusSucRight = getPZS_Recursor @ m @ n (natRec base inductive)
     base :: forall a. PZS_Recursor a 'Zero
     base = PZS_Recursor Refl
     inductive :: forall a b. PZS_Recursor a b -> PZS_Recursor a ('Suc b)
-    inductive (PZS_Recursor Refl) = PZS_Recursor Refl
+    inductive (PZS_Recursor Refl) = trace "PSR" $ PZS_Recursor Refl
 
 newtype PZS_Recursor m n = PZS_Recursor { getPZS_Recursor :: (n + 'Suc m) == 'Suc (n + m) }
 
@@ -51,6 +54,13 @@ newtype PZS_Recursor m n = PZS_Recursor { getPZS_Recursor :: (n + 'Suc m) == 'Su
 data Vector :: Nat -> Type -> Type where
     Nil :: forall a. Vector 'Zero a
     Cons :: forall n a. a -> Vector n a -> Vector ('Suc n) a
+
+instance Foldable (Vector n) where
+    foldMap f Nil = mempty
+    foldMap f (Cons x xs) = f x `mappend` foldMap f xs
+
+instance (Show a) => Show (Vector n a) where
+    show = show . toList
 
 appendV :: Vector n a -> Vector m a -> Vector (n+m) a
 appendV Nil ys = ys
