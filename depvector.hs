@@ -5,6 +5,8 @@ import Data.Kind (Type)
 import Data.Foldable (toList)
 import Debug.Trace
 
+data Proxy a = Proxy
+
 data (==) :: forall a. a -> a -> Type where
     Refl :: x == x
 
@@ -25,30 +27,43 @@ data Nat :: Type where
 type family (+) a b :: Nat where
     'Zero + b = b
     'Suc a + b = 'Suc (a + b)
-  
+
+class NatProp (p :: Nat -> Type) where
+    baseCaseN :: p 'Zero
+    indCaseN  :: p n -> p ('Suc n)
+
+data (p /\ q) x = Product (p x) (q x)
+projL :: (p /\ q) x -> p x
+projL (Product p _) = p
+projR :: (p /\ q) x -> q x
+projR (Product _ q) = q
+
+instance (NatProp p, NatProp q) => NatProp (p /\ q) where
+    baseCaseN = Product baseCaseN baseCaseN
+    indCaseN (Product p q)  = Product (indCaseN p) (indCaseN q)
+
 class IsNat (n :: Nat) where
     natRec :: p 'Zero -> (forall m. p m -> p ('Suc m)) -> p n
+    natProp :: NatProp p => p n
+    natProp = natRec baseCaseN indCaseN
 instance IsNat 'Zero where natRec z _ = z
 instance IsNat n => IsNat ('Suc n) where natRec z s = s (natRec z s)
 
+newtype PlusZeroRight n = PlusZeroRight { getPlusZeroRight :: (n + 'Zero) == n }
+instance NatProp PlusZeroRight where
+    baseCaseN = PlusZeroRight Refl
+    indCaseN (PlusZeroRight Refl) = PlusZeroRight Refl
+
+newtype PlusSucRight n = PlusSucRight { getPlusSucRight :: forall m. Proxy m -> (n + 'Suc m) == 'Suc (n + m) }
+instance NatProp PlusSucRight where
+    baseCaseN = PlusSucRight (const Refl)
+    indCaseN (PlusSucRight f) = trace "indCase" $ PlusSucRight (\proxy -> case f proxy of Refl -> Refl)
+
 plusZeroRight :: IsNat n => (n + 'Zero) == n
-plusZeroRight = getPZR_Recursor $ natRec base inductive
-    where
-    base :: PZR_Recursor 'Zero
-    base = PZR_Recursor Refl
-    inductive :: PZR_Recursor n -> PZR_Recursor ('Suc n)
-    inductive (PZR_Recursor Refl) = trace "PZR" $ PZR_Recursor Refl
-newtype PZR_Recursor n = PZR_Recursor { getPZR_Recursor :: (n + 'Zero) == n }
+plusZeroRight = getPlusZeroRight natProp
 
 plusSucRight :: forall m n. IsNat n => (n + 'Suc m) == 'Suc (n + m) 
-plusSucRight = getPZS_Recursor @ m @ n (natRec base inductive)
-    where
-    base :: forall a. PZS_Recursor a 'Zero
-    base = PZS_Recursor Refl
-    inductive :: forall a b. PZS_Recursor a b -> PZS_Recursor a ('Suc b)
-    inductive (PZS_Recursor Refl) = trace "PSR" $ PZS_Recursor Refl
-
-newtype PZS_Recursor m n = PZS_Recursor { getPZS_Recursor :: (n + 'Suc m) == 'Suc (n + m) }
+plusSucRight = getPlusSucRight @n natProp (Proxy :: Proxy m)
 
 
 data Vector :: Nat -> Type -> Type where
@@ -56,7 +71,7 @@ data Vector :: Nat -> Type -> Type where
     Cons :: forall n a. a -> Vector n a -> Vector ('Suc n) a
 
 instance Foldable (Vector n) where
-    foldMap f Nil = mempty
+    foldMap _ Nil = mempty
     foldMap f (Cons x xs) = f x `mappend` foldMap f xs
 
 instance (Show a) => Show (Vector n a) where
@@ -70,25 +85,27 @@ zipV :: Vector n a -> Vector n b -> Vector n (a,b)
 zipV Nil Nil = Nil
 zipV (Cons x xs) (Cons y ys) = Cons (x,y) (zipV xs ys)
 
+type RevProps = PlusZeroRight /\ PlusSucRight
 
 reverseV :: Vector n a -> Vector n a
-reverseV = go Nil
+reverseV = go baseCaseN Nil
     where
-    go :: forall m n a. (IsNat m) => Vector m a -> Vector n a -> Vector (m+n) a
-    go accum Nil = transportVZ' accum
-    go accum (Cons x xs) = goIndStep accum (Cons x xs)
+    go :: forall m n a. RevProps n -> Vector n a -> Vector m a -> Vector (n+m) a
+    go props accum Nil = transportVZ' (projL props) accum
+    go props accum (Cons x xs) = goIndStep props accum (Cons x xs)
 
-    goIndStep :: forall m n a. (IsNat m) => Vector m a -> Vector ('Suc n) a -> Vector (m + 'Suc n) a
-    goIndStep accum (Cons x xs) = transportVS' @ n @ m (go (Cons x accum) xs)
+    goIndStep :: forall m n a. RevProps n -> Vector n a -> Vector ('Suc m) a -> Vector (n + 'Suc m) a
+    goIndStep props accum (Cons x xs) = transportVS' @m @n (projR props) (go (indCaseN props) (Cons x accum) xs)
+
 
 newtype Flip f x y = Flip { getFlip :: f y x }
 
-transportVZ' :: forall n a. (IsNat n) => Vector n a -> Vector (n + 'Zero) a
-transportVZ' v = getFlip (transport 
-                          (eqSym plusZeroRight)
-                          (Flip v))
+transportVZ' :: forall n a. PlusZeroRight n -> Vector n a -> Vector (n + 'Zero) a
+transportVZ' p v = getFlip (transport 
+                            (eqSym (getPlusZeroRight p))
+                            (Flip v))
 
-transportVS' :: forall m n a. (IsNat n) => Vector ('Suc n + m) a -> Vector (n + 'Suc m) a
-transportVS' v = getFlip (transport 
-                          (eqSym (plusSucRight @ m @ n))
-                          (Flip v))
+transportVS' :: forall m n a. PlusSucRight n -> Vector ('Suc n + m) a -> Vector (n + 'Suc m) a
+transportVS' p v = getFlip (transport 
+                            (eqSym (getPlusSucRight p (Proxy :: Proxy m)))
+                            (Flip v))
