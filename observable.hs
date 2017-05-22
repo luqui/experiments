@@ -33,6 +33,9 @@ reify (Ex (ClassRep alg obs)) = ExClass (Obs (getObs obs . fmap2 rec))
 exify :: ExClass f g -> Ex (ClassRep f g)
 exify (ExClass f) = Ex (ClassRep Mu f)
 
+-- To make an existential datum, e.g. exists a. c a => (a,a), do it by
+-- adjoining two methods to the class var1 :: a, var2 :: a and then taking a
+-- regular Ex.
 
 
 class Repr (c :: * -> Constraint) where
