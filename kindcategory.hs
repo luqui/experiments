@@ -1,7 +1,8 @@
-{-# LANGUAGE RankNTypes, TypeInType, TypeFamilies, TypeOperators, TypeSynonymInstances, FlexibleInstances, GADTs #-}
+{-# LANGUAGE RankNTypes, TypeInType, DataKinds, TypeFamilies, TypeOperators, TypeSynonymInstances, FlexibleInstances, GADTs #-}
 
 import Prelude hiding (id, (.))
 import Data.Kind (Type)
+import Control.Monad ((<=<))
 
 -- f ~> g = forall x. f x ~> g x
 
@@ -35,6 +36,32 @@ instance Cat (Discrete k) where
     type Hom (Discrete k) = (==)
     id = Refl
     Refl . b = b
+
+data a * b = Pair a b
+type family Proj1 (p :: a * b) :: a where
+    Proj1 (Pair x y) = x
+type family Proj2 (p :: a * b) :: b where
+    Proj2 (Pair x y) = y
+
+newtype ArrPair k k' (f :: k * k') (g :: k * k') 
+    = ArrPair { getArrPair :: (Hom k (Proj1 f) (Proj1 g)) * (Hom k' (Proj2 f) (Proj2 g)) }
+
+instance (Cat k, Cat k') => Cat (k * k') where
+    type Hom (k * k') = ArrPair k k'
+    id = ArrPair (Pair id id)
+    ArrPair (Pair g g') . ArrPair (Pair f f') = ArrPair (Pair (g . f) (g' . f'))
+
+newtype Monadic m = M { getM :: Type }
+
+type family GetM m (a :: Monadic m) :: Type where
+    GetM m (M x) = x
+
+newtype MonadHom m (a :: Monadic m) (b :: Monadic m) = MonadHom { getMonadHom :: GetM m a -> m (GetM m b) }
+
+instance (Monad m) => Cat (Monadic m) where
+    type Hom (Monadic m) = MonadHom m
+    id = MonadHom return
+    MonadHom g . MonadHom f = MonadHom (g <=< f)
 
 maybeToList :: Maybe ~> []
 maybeToList = NT (maybe [] (:[]))
