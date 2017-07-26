@@ -61,6 +61,16 @@ instance (Functor f, HasCoalg f a, HasCoalg f b) => HasCoalg f (Either a b) wher
 instance (Functor f, HasCoalg f a) => HasCoalg f (r,a) where
     coalg (r,x) = (r,) <$> coalg x
 
+-- For pairs, there is also this.  It seems we would need some way to
+-- differentiate "product"-like data from "environment"-like data.
+--
+--instance (Applicative f, HasCoalg f a, HasCoalg f b) => HasCoalg f (a,b) where
+--    coalg (a,b) = (,) <$> coalg a <*> coalg b
+--
+-- There is also the dual for HasAlg using linear :: f (a,b) -> (a, f b)
+-- (or many similar treatments) but this is not given by a standard typeclass 
+-- so I have omitted it.
+
 instance (Traversable g, Applicative f, HasCoalg f a) => HasCoalg f (F g a) where
     coalg = sequenceA . fmap coalg
 
