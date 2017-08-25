@@ -39,6 +39,12 @@ block n = replicateM n (pick [False,True])
 bar :: (MonadPick m) => [Int] -> m [[Bool]]
 bar = mapM block
 
+eightBeat :: (MonadPick m) => m [[Bool]]
+eightBeat = shuf <$> block 8
+    where
+    shuf [b8,b7,b6,b5,b4,b3,b2,b1] = 
+        [[b1,b7,b3,b5],[b2,b8,b4,b6]]
+
 renderBar :: [[Bool]] -> String
 renderBar = unwords . (map.map) renderBeat
     where
