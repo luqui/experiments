@@ -1,4 +1,4 @@
-module hott where
+module hott-play where
 
 open import Level
   using (Level ; _⊔_)
