@@ -12,24 +12,41 @@ open import Data.Unit
 open import Data.Maybe
 open import Data.Bool using (Bool ; true ; false)
 open import Data.Nat
-open import Data.Product
+open import Data.Product hiding (∃)
+open import Data.Sum
+open import Function using (id)
 import Level
 open import Relation.Binary.PropositionalEquality
 
 Rel : Set -> Set -> Set
 Rel X Y = X -> Y -> Set
 
-Discrete : {A : Set} -> Rel A A
-Discrete x y = x ≡ y
+-- Combinators for building types-as-relations.
+Discrete : (A : Set) -> Rel A A
+Discrete _ x y = x ≡ y
 
+infixr 50 _~>_
 _~>_ : {A A' B B' : Set} -> Rel A A' -> Rel B B' -> Rel (A -> B) (A' -> B')
-(R ~> R') f g = ∀ x y -> R x y -> R' (f x) (g y)
+(Ra ~> Rb) f g = ∀ x y -> Ra x y -> Rb (f x) (g y)
+
+_<×>_ : {A A' B B' : Set} -> Rel A A' -> Rel B B' -> Rel (A × B) (A' × B')
+(Ra <×> Rb) (a , b) (a' , b') = Ra a a' × Rb b b'
+
+_<⊎>_ : {A A' B B' : Set} -> Rel A A' -> Rel B B' -> Rel (A ⊎ B) (A' ⊎ B')
+(Ra <⊎> Rb) (inj₁ a) (inj₁ a') = Ra a a'
+(Ra <⊎> Rb) (inj₂ b) (inj₂ b') = Rb b b'
+(Ra <⊎> Rb) _ _ = ⊥
 
 Π : {A : Set} -> (A -> Set) -> Set
 Π {A} F = (x : A) -> F x
 
 Λ : {F F' : Set -> Set} -> ({A A' : Set} -> Rel A A' -> Rel (F A) (F' A')) -> Rel (Π F) (Π F')
 Λ F f g = {A A' : Set} (R : Rel A A') -> F R (f A) (g A')
+
+-- (A guess at this definition)
+∃ : {F F' : Set -> Set} -> ({A A' : Set} -> Rel A A' -> Rel (F A) (F' A')) -> Rel (Σ Set F) (Σ Set F')
+∃ F (A , x) (A' , y) = Σ (Rel A A') (\R -> F R x y)
+
 
 FreeTheorem : {A : Set} -> Rel A A -> Set
 FreeTheorem R = ∀ f -> R f f
@@ -112,3 +129,97 @@ reverse-characterization char f R μ ν ind x y r0
   fpow-induction : (n : ℕ) -> R (fpow n μ x) (fpow n ν y)
   fpow-induction zero = r0
   fpow-induction (suc n) = ind _ _ (fpow-induction n)
+
+
+
+-- Some existential play.  From the conclusions here it seems likely that free theorems involving
+-- existentials are not true in Agda, though they seem like they would be true in a weaker
+-- type system.  But since existentials are isomorphic to their rank-2 eliminators, it makes
+-- me think that those free theorems are probably false, too.  Something to explore later.
+
+ExContext : Set -> Set
+ExContext A = Σ Set (\X -> X × (X -> A))
+
+ExContextRel : (A : Set) -> Rel (ExContext A) (ExContext A)
+ExContextRel A = ∃ (\X -> X <×> (X ~> Discrete A))
+
+
+ExContextTheorem : Set -> Set
+ExContextTheorem A = (EX : ExContext A) -> let X , x , f = EX 
+                  in Σ (X -> X -> Set) (\R ->
+                     (R x x) × ((a b : X) -> R a b -> f a ≡ f b))
+
+ex-context-theorem-verify : (A : Set) -> ExContextTheorem A ≡ FreeTheorem (ExContextRel A)
+ex-context-theorem-verify A = refl
+
+-- This theorem is boring, doesn't tell us anything.
+ex-context-theorem-true : (A : Set) -> ExContextTheorem A
+ex-context-theorem-true A (X , x , f) = _≡_ , refl , (\_ _ -> cong f)
+
+-- Maybe we get the interesting results from *eliminating* an ExContext?
+
+ExContextElimRel : (A : Set) {B B' : Set} -> Rel B B' -> Rel (ExContext A -> B) (ExContext A -> B')
+ExContextElimRel A RB = ExContextRel A ~> RB
+
+
+ExContextElimTheorem : Set -> {B : Set} -> Rel B B -> Set
+ExContextElimTheorem A {B} RB = (f : ExContext A -> B)
+                         -> (CX CY : ExContext A)
+                         -> let (X , x , xf) = CX
+                                (Y , y , yf) = CY
+                         in Σ (Rel X Y) (\R ->
+                           (R x y) × ((x' : X) (y' : Y) -> R x' y' -> xf x' ≡ yf y'))
+                         -> RB (f CX) (f CY)
+
+ 
+ex-context-elim-theorem-verify : (A B : Set) (RB : Rel B B) -> ExContextElimTheorem A RB ≡ FreeTheorem (ExContextElimRel A RB)
+ex-context-elim-theorem-verify _ _ _ = refl
+
+module ExContexts (A : Set) (freethm : (B : Set) (RB : Rel B B) -> ExContextElimTheorem A RB) where
+  toA : ExContext A -> A
+  toA (X , x , f) = f x
+
+  fromA : A -> ExContext A
+  fromA a = A , a , id
+
+  bij1 : (a : A) -> toA (fromA a) ≡ a
+  bij1 a = refl
+
+{-
+  bij2-lemma : (B : Set) (f : ExContext A -> B) (ex : ExContext A) -> f (fromA (toA ex)) ≡ f ex
+  bij2-lemma B f ex = 
+    let X , x , xf = fromA (toA ex)
+        Y , y , yf = ex
+    in
+    freethm B f (fromA (toA ex)) ex ((\x y -> xf x ≡ yf y) , refl , (\x' y' p -> p))
+
+  bij2 : (ex : ExContext A) -> fromA (toA ex) ≡ ex
+  bij2 ex = bij2-lemma (ExContext A) id ex
+
+-- Here we see that Agda and ExContextElimTheorem are incompatible, because Agda can look inside existentials.
+ex-context-elim-contradiction : ((A B : Set) -> ExContextElimTheorem A B) -> ⊥ 
+ex-context-elim-contradiction freethm = ⊤-not-Bool (cong proj₁ (ExContexts.bij2 ⊤ (freethm ⊤) (Bool , true , \_ -> tt)))
+  where
+  all-⊤-equal : (x y : ⊤) -> x ≡ y
+  all-⊤-equal tt tt = refl
+
+  ⊤-not-Bool : ⊤ ≡ Bool -> ⊥
+  ⊤-not-Bool p with subst (\ □ -> (x y : □) -> x ≡ y) p all-⊤-equal true false
+  ...             | ()
+-}
+
+
+module SigmaAsPi (A : Set) (F : A -> Set) (ex : Extensionality _ _) where
+   PiRepr = (Z : Set) -> ((x : A) -> F x -> Z) -> Z
+
+   toPiRepr : Σ A F -> PiRepr
+   toPiRepr (x , y) Z elim = elim x y
+
+   fromPiRepr : PiRepr -> Σ A F
+   fromPiRepr r = r (Σ A F) (\x y -> (x , y))
+
+   bij1 : (p : Σ A F) -> fromPiRepr (toPiRepr p) ≡ p
+   bij1 p = refl
+
+   bij2 : (r : PiRepr) -> toPiRepr (fromPiRepr r) ≡ r
+   bij2 r = ex (\x -> ex (\elim -> {!!}))
