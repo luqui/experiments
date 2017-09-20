@@ -9,7 +9,7 @@ module setquot-closure where
 
 open import HoTT
 
-record EqvRel {ℓ i} {A : Set ℓ} (R : Rel A i) : Set (lmax ℓ i) where
+record is-eqv-rel {ℓ i} {A : Set ℓ} (R : Rel A i) : Set (lmax ℓ i) where
   field
     refl : ∀ {x} -> R x x
     sym : ∀ {x y} -> R x y -> R y x
@@ -20,33 +20,32 @@ _⊂_ : ∀ {ℓ i j} {A : Set ℓ} -> Rel A i -> Rel A j -> Set (lmax ℓ (lmax
 _⊂_ R R' = ∀ {x y} -> R x y -> R' x y
 
 
+-- A closure of R is "a smallest" equivalence relation containing R. 
 record is-closure {ℓ i j} {A : Set ℓ} (R : Rel A i) (R* : Rel A j) 
           : Set (lmax ℓ (lmax (lsucc i) j)) where
   field
-    is-eqv-rel : EqvRel R*
+    eqv-rel : is-eqv-rel R*
     contains-R : R ⊂ R*
-    smallest : (R' : Rel A i) -> EqvRel R' -> R ⊂ R' -> R* ⊂ R'
+    smallest : (R' : Rel A i) -> is-eqv-rel R' -> R ⊂ R' -> R* ⊂ R'
 
--- Closure j R is the least equivalence relation containing R.  The index j tells us
--- what universe to quantify over: that is, it's the least of all such relations
--- in universe j.  Notice that Closure is not itself be in universe j (I wonder if
--- it's possible, though).
+-- Closure j R is one way of constructing a closure of R. The index j tells us what universe 
+-- to quantify over: that is, it's the least of all such relations in universe j.  Notice that 
+-- Closure is not itself in universe j.
 Closure : ∀ {ℓ i} {A : Set ℓ} -> ∀ j -> Rel A i -> Rel A (lmax ℓ (lmax i (lsucc j)))
-Closure {ℓ} {i} {A} j R = \x y -> (R' : Rel A j) -> EqvRel R' -> R ⊂ R' -> R' x y
-
+Closure {ℓ} {i} {A} j R = \x y -> (R' : Rel A j) -> is-eqv-rel R' -> R ⊂ R' -> R' x y
 
 module Closure {ℓ i} {A : Set ℓ} {R : Rel A i} where
   -- Closure is in fact an equivalence relation,...
-  Closure-EqvRel : EqvRel (Closure i R)
-  Closure-EqvRel = record
-    { refl = \R' eqv subrel -> EqvRel.refl eqv
-    ; sym = \rxy R' eqv subrel -> EqvRel.sym eqv (rxy R' eqv subrel)
-    ; trans = \rxy ryz R' eqv subrel -> EqvRel.trans eqv (rxy R' eqv subrel) (ryz R' eqv subrel)
+  Closure-is-eqv-rel : is-eqv-rel (Closure i R)
+  Closure-is-eqv-rel = record
+    { refl = \R' eqv subrel -> is-eqv-rel.refl eqv
+    ; sym = \rxy R' eqv subrel -> is-eqv-rel.sym eqv (rxy R' eqv subrel)
+    ; trans = \rxy ryz R' eqv subrel -> is-eqv-rel.trans eqv (rxy R' eqv subrel) (ryz R' eqv subrel)
     }
 
   Closure-is-closure : is-closure R (Closure i R)
   Closure-is-closure = record
-    { is-eqv-rel = Closure-EqvRel
+    { eqv-rel = Closure-is-eqv-rel
     ; contains-R = \rxy R' eqv subrel -> subrel rxy
     ; smallest   = \R' eqv subrel qxy -> qxy R' eqv subrel
     }
@@ -74,8 +73,8 @@ module _ {ℓ i j} {A : Set ℓ}
     q= : (x y : A) -> Set _
     q= x y = q[ x ]/ R == q[ y ]/ R
 
-    q=-EqvRel : EqvRel q=
-    q=-EqvRel = record
+    q=-is-eqv-rel : is-eqv-rel q=
+    q=-is-eqv-rel = record
       { refl = idp
       ; sym = !
       ; trans = _∙_
@@ -100,7 +99,7 @@ module _ {ℓ i j} {A : Set ℓ}
   
     from : SetQuot R* -> SetQuot R
     from = SetQuot-rec {B = SetQuot R} SetQuot-level (\x -> q[ x ])
-             (is-closure.smallest R*-is-closure q= q=-EqvRel quot-rel)
+             (is-closure.smallest R*-is-closure q= q=-is-eqv-rel quot-rel)
 
     to-from : ∀ x -> to (from x) == x
     to-from = SetQuot-elim {P = \q -> to (from q) == q} 
