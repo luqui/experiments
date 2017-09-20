@@ -4,8 +4,8 @@ module setquot-closure where
 
 -- I noticed that SetQuot R didn't require R to be an equivalence relation to be
 -- well-defined, and wondered what it would mean if it weren't one.  This short
--- development answers that question, that it's equivalent to SetQuot (Free R),
--- where Free R is the smallest equivalence relation containing R.
+-- development answers that question, that it's equivalent to SetQuot (Closure R),
+-- where Closure R is the smallest equivalence relation containing R.
 
 open import HoTT
 
@@ -19,30 +19,30 @@ record EqvRel {ℓ i} {A : Set ℓ} (R : Rel A i) : Set (lmax ℓ i) where
 _⊂_ : ∀ {ℓ i j} {A : Set ℓ} -> Rel A i -> Rel A j -> Set (lmax ℓ (lmax i j))
 _⊂_ R R' = ∀ {x y} -> R x y -> R' x y
 
--- Free j R is the least equivalence relation containing R.  The index j tells us
+-- Closure j R is the least equivalence relation containing R.  The index j tells us
 -- what universe to quantify over: that is, it's the least of all such relations
--- in universe j.  Notice that Free is not itself be in universe j (I wonder if
+-- in universe j.  Notice that Closure is not itself be in universe j (I wonder if
 -- it's possible, though).
-Free : ∀ {ℓ i} {A : Set ℓ} -> ∀ j -> Rel A i -> Rel A (lmax ℓ (lmax i (lsucc j)))
-Free {ℓ} {i} {A} j R = \x y -> (R' : Rel A j) -> EqvRel R' -> R ⊂ R' -> R' x y
+Closure : ∀ {ℓ i} {A : Set ℓ} -> ∀ j -> Rel A i -> Rel A (lmax ℓ (lmax i (lsucc j)))
+Closure {ℓ} {i} {A} j R = \x y -> (R' : Rel A j) -> EqvRel R' -> R ⊂ R' -> R' x y
 
 
-module Free {ℓ i j} {A : Set ℓ} {R : Rel A i} where
-  -- Free is in fact an equivalence relation,...
-  Free-EqvRel : EqvRel (Free j R)
-  Free-EqvRel = record
+module Closure {ℓ i j} {A : Set ℓ} {R : Rel A i} where
+  -- Closure is in fact an equivalence relation,...
+  Closure-EqvRel : EqvRel (Closure j R)
+  Closure-EqvRel = record
     { refl = \R' eqv subrel -> EqvRel.refl eqv
     ; sym = \rxy R' eqv subrel -> EqvRel.sym eqv (rxy R' eqv subrel)
     ; trans = \rxy ryz R' eqv subrel -> EqvRel.trans eqv (rxy R' eqv subrel) (ryz R' eqv subrel)
     }
 
   -- Containing R,...
-  Free-subrel : R ⊂ Free j R
-  Free-subrel rxy R' eqv subrel = subrel rxy
+  Closure-subrel : R ⊂ Closure j R
+  Closure-subrel rxy R' eqv subrel = subrel rxy
 
   -- And the least one.
-  Free-least : {R' : Rel A j} -> R ⊂ R' -> EqvRel R' -> Free j R ⊂ R'
-  Free-least subrel eqv freerxy = freerxy _ eqv subrel
+  Closure-least : {R' : Rel A j} -> R ⊂ R' -> EqvRel R' -> Closure j R ⊂ R'
+  Closure-least subrel eqv freerxy = freerxy _ eqv subrel
 
 module _ where
   private
@@ -52,8 +52,8 @@ module _ where
     q[ x ]/ R = q[ x ]
 
     -- This tiny definition is the key to the whole development (look at where
-    -- it is used below in `from`).  Free R can be thought of as R with extra edges added to make 
-    -- it an equivalence relation.  When we pass q=-EqvRel to a Free R, we "interpret" those edges
+    -- it is used below in `from`).  Closure R can be thought of as R with extra edges added to make 
+    -- it an equivalence relation.  When we pass q=-EqvRel to a Closure R, we "interpret" those edges
     -- as equalities in SetQuot R, which might not immediately follow from quot-rel (e.g.
     -- it might take a few quot-rel's and transitivity). The fact that those edges can always be
     -- interepreted in SetQuot R comes from the fact that quot-rel's codomain is an equivalence 
@@ -76,14 +76,14 @@ module _ where
 
   -- And the punchline.
   SetQuot-preserves-closure : ∀ {ℓ} {i} {A : Set ℓ} {R : Rel A i} 
-                           -> SetQuot R ≃ SetQuot (Free (lmax ℓ i) R)
+                           -> SetQuot R ≃ SetQuot (Closure (lmax ℓ i) R)
   SetQuot-preserves-closure {ℓ} {i} {A} {R} = equiv to from to-from from-to
     where
-    to : SetQuot R -> SetQuot (Free (lmax ℓ i) R)
-    to = SetQuot-rec {B = SetQuot (Free (lmax ℓ i) R)} SetQuot-level (\x -> q[ x ]) 
-            (\rxy -> quot-rel (Free.Free-subrel rxy))
+    to : SetQuot R -> SetQuot (Closure (lmax ℓ i) R)
+    to = SetQuot-rec {B = SetQuot (Closure (lmax ℓ i) R)} SetQuot-level (\x -> q[ x ]) 
+            (\rxy -> quot-rel (Closure.Closure-subrel rxy))
   
-    from : SetQuot (Free (lmax ℓ i) R) -> SetQuot R
+    from : SetQuot (Closure (lmax ℓ i) R) -> SetQuot R
     from = SetQuot-rec {B = SetQuot R} SetQuot-level (\x -> q[ x ])
              (\freerxy -> freerxy _ q=-EqvRel quot-rel )
 
