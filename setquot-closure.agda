@@ -116,3 +116,8 @@ module _ {ℓ i j} {A : Set ℓ}
                  (\r -> is-set-all-PathOver-paths (\_ -> SetQuot-level) 
                                                   (\x -> from (to x)) (\x -> x)
                                                   (quot-rel r))
+
+private
+  -- Those universe levels are a PITA, here's an example.
+  check : ∀ {ℓ i} {A : Set ℓ} {R : Rel A (lmax ℓ i)} -> SetQuot R ≃ SetQuot (Closure (lmax ℓ i) R) 
+  check {ℓ} {i} = SetQuot-preserves-closure {ℓ} {i} Closure.Closure-is-closure
