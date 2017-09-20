@@ -38,30 +38,32 @@ Free-EqvRel = record
   ; trans = \rxy ryz R' eqv subrel -> EqvRel.trans eqv (rxy R' eqv subrel) (ryz R' eqv subrel)
   }
 
-Free-subrel : ∀ {ℓ j} {A : Set ℓ} {R : Rel A ℓ} -> R ⊂ Free j R
+Free-subrel : ∀ {ℓ i j} {A : Set ℓ} {R : Rel A i} -> R ⊂ Free j R
 Free-subrel rxy R' eqv subrel = subrel rxy
 
-Free-least : ∀ {ℓ i j} {A : Set ℓ} {R : Rel A i} {R' : Rel A j} -> R ⊂ R' -> EqvRel R' -> Free j R ⊂ R'
+Free-least : ∀ {ℓ i j} {A : Set ℓ} {R : Rel A i} {R' : Rel A j} 
+          -> R ⊂ R' -> EqvRel R' -> Free j R ⊂ R'
 Free-least subrel eqv freerxy = freerxy _ eqv subrel
 
-is-set-all-PathOver-paths : ∀ {i j} {A : Set i} {B : A -> Set j} -> 
-         ((x : A) -> is-set (B x)) ->
-         (f g : Π A B) 
-         {x y : A} (s : x == y)
-         {p : f x == g x} {q : f y == g y}
+is-set-all-PathOver-paths : ∀ {i j} {A : Set i} {B : A -> Set j} 
+      -> ((x : A) -> is-set (B x))
+      -> (f g : Π A B) 
+      -> {x y : A} (s : x == y)
+      -> {p : f x == g x} {q : f y == g y}
       -> PathOver (\x -> f x == g x) s p q
 is-set-all-PathOver-paths isset f g {x = x} idp {p} {q} = fst (isset x (f x) (g x) p q) 
 
-SetQuot-preserves-closure : ∀ {ℓ} {A : Set ℓ} {R : Rel A ℓ} -> SetQuot R ≃ SetQuot (Free ℓ R)
-SetQuot-preserves-closure {ℓ} {A} {R} = equiv to from to-from from-to
+SetQuot-preserves-closure : ∀ {ℓ} {i} {A : Set ℓ} {R : Rel A i} 
+                         -> SetQuot R ≃ SetQuot (Free (lmax ℓ i) R)
+SetQuot-preserves-closure {ℓ} {i} {A} {R} = equiv to from to-from from-to
   where
-  to : SetQuot R -> SetQuot (Free ℓ R)
-  to = SetQuot-rec {B = SetQuot (Free ℓ R)} SetQuot-level (\x -> q[ x ]) 
+  to : SetQuot R -> SetQuot (Free (lmax ℓ i) R)
+  to = SetQuot-rec {B = SetQuot (Free (lmax ℓ i) R)} SetQuot-level (\x -> q[ x ]) 
           (\rxy -> quot-rel (Free-subrel rxy))
   
-  from : SetQuot (Free ℓ R) -> SetQuot R
+  from : SetQuot (Free (lmax ℓ i) R) -> SetQuot R
   from = SetQuot-rec {B = SetQuot R} SetQuot-level (\x -> q[ x ])
-           (\freerxy -> freerxy _ q=-EqvRel quot-rel)
+           (\freerxy -> freerxy _ q=-EqvRel quot-rel )
 
   to-from : ∀ x -> to (from x) == x
   to-from = SetQuot-elim {P = \q -> to (from q) == q} 
