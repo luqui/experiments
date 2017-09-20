@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --type-in-type #-}
+{-# OPTIONS --without-K --type-in-type --rewriting #-}
 
 module freetheorems where
 
@@ -91,71 +91,22 @@ cons x xs (S n , p) = xs (n , <-cancel-S p)
 replicate : {A : Set} {n : Nat} (x : A) -> Vector n A
 replicate x _ = x
 
-cons-replicate : {n : Nat} {A : Set} {x : A} -> cons x (replicate {n = n} x) == replicate x
-cons-replicate = λ= (\{ (O , p) -> idp ; (S n , p) -> idp })
+cons-replicate : {n : Nat} {A : Set} {x : A} {m : Fin (S n)} -> cons x (replicate {n = n} x) m == replicate x m
+cons-replicate {m = O , p} = idp
+cons-replicate {m = S m , p} = idp
 
 <-antisym : {n : Nat} -> ¬ (n < n)
 <-antisym {O} ()
 <-antisym {S n} p = <-antisym (<-cancel-S p)
 
-absurd : {A : Set} -> ⊥ -> A
-absurd ()
-
-
-<-rec : {n : Nat}
-     -> (P : {m : Nat} -> n < m -> Set)
-     -> P ltS
-     -> ({m : Nat} {q : n < m} -> P q -> P (ltSR q)) 
-     -> {m : Nat} (p : n < m) -> P p
-<-rec P lts ltsr ltS = lts
-<-rec P lts ltsr (ltSR p) = ltsr (<-rec P lts ltsr p)
-
--- Ugh we have to reimplement a lot of < functions because they were marked abstract
--- for some reason.
-<-trans' : {m n k : ℕ} → m < n → n < k → m < k
-<-trans' lt₁ ltS = ltSR lt₁
-<-trans' lt₁ (ltSR lt₂) = ltSR (<-trans' lt₁ lt₂)
-
-<-ap-S' : {m n : ℕ} → m < n → S m < S n
-<-ap-S' ltS = ltS
-<-ap-S' (ltSR lt) = ltSR (<-ap-S' lt)
-
-<-cancel-S' : {m n : ℕ} → S m < S n → m < n
-<-cancel-S' ltS = ltS
-<-cancel-S' (ltSR lt) = <-trans' ltS lt  
-
-n-Sn-has-all-paths : {n : Nat} -> has-all-paths (n < S n)
-n-Sn-has-all-paths {O} ltS ltS = idp
-n-Sn-has-all-paths {O} ltS (ltSR ())
-n-Sn-has-all-paths {O} (ltSR ()) q
-n-Sn-has-all-paths {S n} p q 
-  = let r = n-Sn-has-all-paths (<-cancel-S' p) (<-cancel-S' q) 
-     in ! (<-cancel-S-ap p) ∙ ap (<-ap-S') r ∙ <-cancel-S-ap q
-  where
-  this-is-getting-ridiculous : {m n : Nat} (p : S m < n) -> <-ap-S' (<-trans' ltS p) == ltSR p
-  this-is-getting-ridiculous ltS = idp
-  this-is-getting-ridiculous (ltSR p) = ap ltSR (this-is-getting-ridiculous p)
-
-  <-cancel-S-ap : {m n : Nat} -> (p : S m < S n) -> <-ap-S' (<-cancel-S' p) == p
-  <-cancel-S-ap ltS = idp
-  <-cancel-S-ap (ltSR p) = this-is-getting-ridiculous p
-
-<-irrefl : {n : Nat} -> ¬ (n < n)
-<-irrefl {O} ()
-<-irrefl {S n} p = <-irrefl (<-cancel-S p)
-
-<-is-mere-prop : {n n' : Nat} -> has-all-paths (n < n')
-<-is-mere-prop {n} {O} () ()
-<-is-mere-prop {.n'} {S n'} ltS q = n-Sn-has-all-paths ltS q
-<-is-mere-prop {n} {S _} (ltSR p) ltS = absurd (<-irrefl p)
-<-is-mere-prop {n} {S n'} (ltSR p) (ltSR q) = ap ltSR (<-is-mere-prop p q)
-
-
 Σ-mere-prop-eq : {A : Set} {F : A -> Set} -> ((x : A) -> has-all-paths (F x)) -> (a b : Σ A F) -> fst a == fst b -> a == b
 Σ-mere-prop-eq f (a1 , a2) (.a1 , b2) idp = pair= idp (f a1 a2 b2)
 
 Fin-eq : {n : ℕ} -> (a b : Fin n) -> fst a == fst b -> a == b
-Fin-eq = Σ-mere-prop-eq (\x -> <-is-mere-prop {x})
+Fin-eq = Σ-mere-prop-eq (\x -> <-has-all-paths)
+
+Fin-contr : {n : ℕ} -> (a b : Fin n) -> fst a == fst b -> is-contr (a == b)
+Fin-contr a b p = Fin-eq a b p , (\q -> prop-has-all-paths (Fin-is-set a b) (Fin-eq a b p) q)
 
 evalType : {n : Nat} -> Vector n Set -> TypeExp n -> Set
 evalType env boolT = Bool
@@ -170,42 +121,40 @@ addEnvR : {n : Nat} {envA envB : Vector n Set} {T T' : Set}
 addEnvR r envR (O , p) = r
 addEnvR r envR (S n , p) = envR (n , <-cancel-S p) 
 
-lift-relation : {n : Nat} {T T' : Set} (R : Rel T T') (i : Fin (S n)) 
-      -> Rel (cons T (replicate T) i) (cons T' (replicate T') i)
-lift-relation {n} {T} {T'} R rewrite cons-replicate {n} {Set} {T}
-                                   | cons-replicate {n} {Set} {T'}
-   = \_ -> R
+diagEnvR : {n : Nat} (env : Vector n Set) (i : Fin n) -> Rel (env i) (env i)
+diagEnvR envA i = _==_
 
-addEnvR-const : {n : Nat} {T T' : Set} {R : Rel T T'} 
-            -> addEnvR {n} {replicate T} {replicate T'} R (\_ -> R) 
-                == (lift-relation R)
-addEnvR-const = {!!}
+addEnvR-const-diag : {n : Nat} (env : Vector n Set) (A : Set) -> addEnvR (_==_ {_} {A}) (diagEnvR env) == diagEnvR (cons A env)
+addEnvR-const-diag env A = λ= \{ (O , p) -> idp ; (S i , p) -> idp }
 
-relType : {n  : Nat} {envA envB : Vector n Set} (envR : (i : Fin n) -> Rel (envA i) (envB i)) (tA : TypeExp n) (tB : TypeExp n) -> Rel (evalType envA tA) (evalType envB tB)
-relType envR boolT boolT = Discrete Bool
-relType envR (arrowT t u) (arrowT t' u') = relType envR t t' ~> relType envR u u'
-relType envR (forAllT t) (forAllT t') = Λ (\r -> relType (addEnvR r envR) t t') 
-relType {_} {envA} {envB} envR (varT n) (varT n')
-                                   with ℕ-has-dec-eq (fst n) (fst n')
-...                                | inl eq = transport (\i -> envA n -> envB i -> Set) (Fin-eq n n' eq) (envR n)
-...                                | inr ne = \_ _ -> ⊥
-relType _ _ _ _ _ = ⊥
+relType : {n : Nat} {envA envB : Vector n Set} (envR : (i : Fin n) -> Rel (envA i) (envB i)) (t : TypeExp n) -> Rel (evalType envA t) (evalType envB t)
+relType envR boolT = Discrete Bool
+relType envR (arrowT t u) = relType envR t ~> relType envR u
+relType envR (forAllT t) = Λ (\r -> relType (addEnvR r envR) t)
+relType envR (varT n) = envR n
 
 
 rel-is-eq : {n : Nat} (env : Vector n Set) (t : TypeExp n)
-         -> relType {_} {env} {env} (\_ -> _==_) t t == _==_
+         -> relType (diagEnvR env) t == _==_
 rel-is-eq _ boolT = idp
-rel-is-eq env (arrowT t u)
-  rewrite rel-is-eq env t | rel-is-eq env u = EqPreserving.~>-preserves-eq
-rel-is-eq env (forAllT t) = {!!}
-rel-is-eq env (varT x) with ℕ-has-dec-eq (fst x) (fst x)
-...                          | inl eq = let eq-is-idp = fst (ℕ-is-set (fst x) (fst x) eq idp)
-                                         in transport (\p -> transport (\i -> env x -> env i -> Set) (Fin-eq x x p) _==_ == _==_) (! eq-is-idp) {!idp!}
-                    -- transport (\p -> transport _ p _ == _) eq-is-idp idp
-...                          | inr ne = {!!}
--- ...                       | inl eq = {!!} -- rewrite (Fin-eq x x eq) = idp
--- ...                       | inr ne = absurd (ne idp)
+rel-is-eq env (arrowT t u) = transport! (\ □ -> □ ~> relType (\_ -> _==_) u == _==_) (rel-is-eq env t)
+                            (transport! (\ □ -> _==_ ~> □ == _==_) (rel-is-eq env u)
+                             EqPreserving.~>-preserves-eq)
+rel-is-eq env (forAllT t) = λ= \f -> λ= \g -> ua eqv
+  where
+  eqv : ∀ {n} {env : Fin n → Set}
+        {t : TypeExp (S n)} {f g : ∀ x → evalType (cons x env) t} →
+        Λ (\R -> relType (addEnvR R (\_ -> _==_)) t) f g ≃ (f == g)
+  eqv {env = env} {t = t} {f = f} {g = g} = (\k -> λ= \X ->
+     let step1 = k X X _==_ 
+         step2 = transport (\ □ -> relType □ t (f X) (g X)) (addEnvR-const-diag env X) step1
+         step3 = transport (\ □ -> □ (f X) (g X)) (rel-is-eq (cons X env) t) step2
+      in step3) , is-eq _ (\p -> transport! (\ □ -> Λ (\R -> relType (addEnvR R (diagEnvR env)) t) □ g) p 
+                                 {!!}) 
+                          {!!} {!!}
+rel-is-eq env (varT x) = idp
 
+{-
 {-
 FreeTheorem : TypeExp O -> Set
 FreeTheorem t = (x : evalType nilV t) -> relType (\{ (_ , ()) }) t t x x
@@ -215,4 +164,6 @@ all-free-theorems boolT x = idp
 all-free-theorems (arrowT t u) f a b r = {!!}
 all-free-theorems (forAllT t) x R = {!!}
 all-free-theorems (varT x) x₁ = {!!}
+-}
+
 -}
