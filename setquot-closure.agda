@@ -46,6 +46,11 @@ module Free {ℓ i j} {A : Set ℓ} {R : Rel A i} where
 
 module _ where
   private
+    -- Just some notation, q[ x ]/ R, the equivalence class of x by R.
+    infix 90 q[_]/_
+    q[_]/_ : ∀ {ℓ i} {A : Set ℓ} -> A -> (R : Rel A i) -> SetQuot R
+    q[ x ]/ R = q[ x ]
+
     -- This tiny definition is the key to the whole development (look at where
     -- it is used below in `from`).  Free R can be thought of as R with extra edges added to make 
     -- it an equivalence relation.  When we pass q=-EqvRel to a Free R, we "interpret" those edges
@@ -53,7 +58,8 @@ module _ where
     -- it might take a few quot-rel's and transitivity). The fact that those edges can always be
     -- interepreted in SetQuot R comes from the fact that quot-rel's codomain is an equivalence 
     -- relation.
-    q=-EqvRel : ∀ {ℓ i} {A : Set ℓ} {R : Rel A i} -> EqvRel (\x y ->  q[_] {R = R} x == q[ y ])
+    q=-EqvRel : ∀ {ℓ i} {A : Set ℓ} {R : Rel A i} 
+             -> EqvRel (\x y -> q[ x ]/ R == q[ y ]/ R)
     q=-EqvRel = record
       { refl = idp
       ; sym = !
