@@ -113,7 +113,27 @@ Bool≃Bool=Bool = equiv to from to-from from-to
   ...              | inl q = ⊥-rec (Bool-has-distinct-paths q)
   ...              | inr q = idp
 
-
 -- I'm trying to construct a type with only one element but more than one
 -- path without using HITs. I'm having trouble; maybe it's impossible, but I
 -- don't know how I would show that.
+
+
+-- Hmm, ok, what if we try a Scott encoding. We have this HIT:
+--
+-- data BoolSpace : Set where
+--   base : BoolSpace
+--   path : base == base
+--
+-- Its induction principle is:
+--
+-- BoolSpace-ind : {P : BoolSpace -> Set} -> (pbase : P base) -> pbase == pbase -> (b : BoolSpace) -> P b
+--
+-- Making a Scott encoding of this is pretty impossible.  What about its recursion principle?
+--
+-- BoolSpace-rec : {B : Set} (x : B) -> x == x -> BoolSpace -> B
+--
+-- Thus the Scott encoding:
+
+BoolSpace = {B : Set} (x : B) -> x == x -> B
+
+-- Let's study this type.
