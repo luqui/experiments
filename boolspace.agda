@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --rewriting #-}
+{-# OPTIONS --without-K --rewriting  #-}
 
 module boolspace where
 
@@ -15,6 +15,18 @@ inspect : ∀ {a b} {A : Set a} {B : A → Set b}
           (f : (x : A) → B x) (x : A) → Reveal f · x is f x
 inspect f x = r[ idp ]
 
+Σ-prop-det : ∀ {i} {j} {A : Set i} {B : A -> Set j} -> Π A (is-prop ∘ B) -> {a b : Σ A B} -> fst a == fst b -> a == b
+Σ-prop-det prop {a} {b} idp = pair= idp (prop-has-all-paths (prop (fst b)) _ _)
+
+
+ua-ide : ∀ {ℓ} {A : Set ℓ} -> ua (ide A) == idp
+ua-ide {_} {A} = ap ua idp ∙ ua-η _
+
+ua-⁻¹ : ∀ {ℓ} {A B : Set ℓ} {e : A ≃ B} -> ua (e ⁻¹) == ! (ua e)
+ua-⁻¹ = equiv-induction (\e' -> ua (e' ⁻¹) == ! (ua e')) (\A -> ap ua flipit ∙ ua-ide ∙ ap ! (! ua-ide)) _
+  where
+  flipit : ∀ {ℓ} {A : Set ℓ} -> ide A ⁻¹ == ide A
+  flipit = Σ-prop-det (\_ -> is-equiv-is-prop) idp
 
 not : Bool -> Bool
 not true = false
@@ -25,6 +37,9 @@ not-is-equiv = is-eq not not (\{ true -> idp ; false -> idp }) (\{ true -> idp ;
 
 not-equiv : Bool ≃ Bool
 not-equiv = not , not-is-equiv
+
+reverse-not-equiv : not-equiv ⁻¹ == not-equiv
+reverse-not-equiv = Σ-prop-det (\_ -> is-equiv-is-prop) idp
 
 Bool=Bool-not : Bool == Bool
 Bool=Bool-not = ua not-equiv
@@ -117,23 +132,56 @@ Bool≃Bool=Bool = equiv to from to-from from-to
 -- path without using HITs. I'm having trouble; maybe it's impossible, but I
 -- don't know how I would show that.
 
+-- I think this type might.  There's only one observable value of this type
+-- but there ought to be two paths.
 
--- Hmm, ok, what if we try a Scott encoding. We have this HIT:
---
--- data BoolSpace : Set where
---   base : BoolSpace
---   path : base == base
---
--- Its induction principle is:
---
--- BoolSpace-ind : {P : BoolSpace -> Set} -> (pbase : P base) -> pbase == pbase -> (b : BoolSpace) -> P b
---
--- Making a Scott encoding of this is pretty impossible.  What about its recursion principle?
---
--- BoolSpace-rec : {B : Set} (x : B) -> x == x -> BoolSpace -> B
---
--- Thus the Scott encoding:
+P2 = Σ Set (\A -> A == Bool)
+baseP2 : P2
+baseP2 = Bool , idp
+path-to-baseP2 : (x : P2) -> x == baseP2
+path-to-baseP2 (A , idp) = idp
 
-BoolSpace = {B : Set} (x : B) -> x == x -> B
+=-emap-l : ∀ {ℓ} {X Y Z : Set ℓ} -> X ≃ Y -> (X == Z) ≃ (Y == Z)
+=-emap-l {_} {X} {Y} {Z} e = equiv to from to-from from-to
+  where
+  to : X == Z -> Y == Z
+  to p = ! (ua e) ∙ p
 
--- Let's study this type.
+  from : Y == Z -> X == Z
+  from p = ua e ∙ p
+
+  to-from : ∀ p -> to (from p) == p
+  to-from idp = ap (! (ua e) ∙_) (∙-unit-r _) ∙ !-inv-l (ua e)
+  
+  from-to : ∀ p -> from (to p) == p
+  from-to idp = ap (ua e ∙_) (∙-unit-r _) ∙ !-inv-r (ua e)
+
+=-emap-l-ide : ∀ {ℓ} {X Z : Set ℓ} -> =-emap-l (ide X) == ide (X == Z)
+=-emap-l-ide = Σ-prop-det (\_ -> is-equiv-is-prop) (λ= (\p -> ap (\ □ -> ! □ ∙ p) ua-ide))
+
+
+=-emap-ua-commute : {X Y Z : Set} {e : X ≃ Y} -> ap (\A -> A == Z) (ua e) == ua (=-emap-l e)
+=-emap-ua-commute {Z = Z} {e = e} = equiv-induction (\e' -> ap (\A -> A == Z) (ua e') == ua (=-emap-l e')) 
+                                     (\A -> ap (ap (_== Z)) ua-ide ∙ ! ua-ide ∙ ap ua (! =-emap-l-ide)) e
+
+-- coe-equiv (ua (ide A)) == ide A
+
+-- ua (ide A) == idp
+
+counterexample : transport (\A -> A == Bool) (ua not-equiv) idp == Bool=Bool-not
+counterexample = ap (\ □ -> coe □ idp) =-emap-ua-commute ∙ coe-β (=-emap-l not-equiv) _ ∙ ∙-unit-r (! Bool=Bool-not) ∙ ! ua-⁻¹ ∙ ap ua reverse-not-equiv
+
+-- This tells us that we baseP2 = (Bool , idp), when we apply Bool=Bool-not to the first arg, we get Bool=Bool-not in the second arg.
+-- IOW, 
+
+path-in-P2 : (Bool , Bool=Bool-not) == baseP2
+path-in-P2 = ! (pair= Bool=Bool-not (from-transp _ _ counterexample))
+
+-- But, like, of course it is because all P2s are equal from path-to-baseP2.  I guess we can ask
+
+question : path-to-baseP2 _ == path-in-P2
+question = {!!}
+
+-- And this path very likely does not exist.
+path-in-baseP2 : baseP2 == baseP2
+path-in-baseP2 = pair= Bool=Bool-not (from-transp _ _ {!!})
