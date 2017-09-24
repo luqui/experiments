@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --rewriting  #-}
+{-# OPTIONS --without-K --rewriting #-}
 
 module boolspace where
 
@@ -17,6 +17,10 @@ inspect f x = r[ idp ]
 
 Σ-prop-det : ∀ {i} {j} {A : Set i} {B : A -> Set j} -> Π A (is-prop ∘ B) -> {a b : Σ A B} -> fst a == fst b -> a == b
 Σ-prop-det prop {a} {b} idp = pair= idp (prop-has-all-paths (prop (fst b)) _ _)
+
+-- Agda can't seem to normalize this term.
+bug : ∀ {i} {j} {A : Set i} {B : Set j} -> {e e' : A ≃ B} -> fst e == fst e' -> e == e'
+bug = Σ-prop-det (\_ -> is-equiv-is-prop)
 
 
 ua-ide : ∀ {ℓ} {A : Set ℓ} -> ua (ide A) == idp
