@@ -132,6 +132,9 @@ Bool≃Bool=Bool = equiv to from to-from from-to
   ...              | inl q = ⊥-rec (Bool-has-distinct-paths q)
   ...              | inr q = idp
 
+Bool=Bool-is-set : is-set (Bool == Bool)
+Bool=Bool-is-set = equiv-preserves-level Bool≃Bool=Bool Bool-is-set
+
 -- I'm trying to construct a type with only one element but more than one
 -- path without using HITs. I'm having trouble; maybe it's impossible, but I
 -- don't know how I would show that.
@@ -181,11 +184,23 @@ counterexample = ap (\ □ -> coe □ idp) =-emap-ua-commute ∙ coe-β (=-emap-
 path-in-P2 : (Bool , Bool=Bool-not) == baseP2
 path-in-P2 = ! (pair= Bool=Bool-not (from-transp _ _ counterexample))
 
--- But, like, of course it is because all P2s are equal from path-to-baseP2.  I guess we can ask
+-- But, like, of course it is because all P2s are equal from path-to-baseP2.
 
+-- Anyway, the nontrivial path I'm looking for, baseP2 == baseP2, probably does not exist because
+
+no-idp-loop-for-not-path : idp == idp [ (_== Bool) ↓ Bool=Bool-not ] -> ⊥
+no-idp-loop-for-not-path p = Bool-has-distinct-paths (! counterexample ∙ to-transp p)
+
+-- Oh, yep, here we go.  It doesn't.  Darn.
+
+baseP2-loopspace-is-contr : is-contr (baseP2 == baseP2)
+baseP2-loopspace-is-contr = idp , lemma
+  where
+  lemma : {b : P2} (p : b == baseP2) -> path-to-baseP2 b == p
+  lemma idp = idp
+
+-- Here's a question
 question : path-to-baseP2 _ == path-in-P2
-question = {!!}
+question = {! !}
 
--- And this path very likely does not exist.
-path-in-baseP2 : baseP2 == baseP2
-path-in-baseP2 = pair= Bool=Bool-not (from-transp _ _ {!!})
+
