@@ -142,11 +142,6 @@ Bool=Bool-is-set = equiv-preserves-level Bool≃Bool=Bool Bool-is-set
 -- I think this type might.  There's only one observable value of this type
 -- but there ought to be two paths.
 
-P2 = Σ Set (\A -> A == Bool)
-baseP2 : P2
-baseP2 = Bool , idp
-path-to-baseP2 : (x : P2) -> x == baseP2
-path-to-baseP2 (A , idp) = idp
 
 =-emap-l : ∀ {ℓ} {X Y Z : Set ℓ} -> X ≃ Y -> (X == Z) ≃ (Y == Z)
 =-emap-l {_} {X} {Y} {Z} e = equiv to from to-from from-to
@@ -171,36 +166,56 @@ path-to-baseP2 (A , idp) = idp
 =-emap-ua-commute {Z = Z} {e = e} = equiv-induction (\e' -> ap (\A -> A == Z) (ua e') == ua (=-emap-l e')) 
                                      (\A -> ap (ap (_== Z)) ua-ide ∙ ! ua-ide ∙ ap ua (! =-emap-l-ide)) e
 
--- coe-equiv (ua (ide A)) == ide A
-
--- ua (ide A) == idp
-
 counterexample : transport (\A -> A == Bool) (ua not-equiv) idp == Bool=Bool-not
 counterexample = ap (\ □ -> coe □ idp) =-emap-ua-commute ∙ coe-β (=-emap-l not-equiv) _ ∙ ∙-unit-r (! Bool=Bool-not) ∙ ! ua-⁻¹ ∙ ap ua reverse-not-equiv
-
--- This tells us that we baseP2 = (Bool , idp), when we apply Bool=Bool-not to the first arg, we get Bool=Bool-not in the second arg.
--- IOW, 
-
-path-in-P2 : (Bool , Bool=Bool-not) == baseP2
-path-in-P2 = ! (pair= Bool=Bool-not (from-transp _ _ counterexample))
-
--- But, like, of course it is because all P2s are equal from path-to-baseP2.
-
--- Anyway, the nontrivial path I'm looking for, baseP2 == baseP2, probably does not exist because
 
 no-idp-loop-for-not-path : idp == idp [ (_== Bool) ↓ Bool=Bool-not ] -> ⊥
 no-idp-loop-for-not-path p = Bool-has-distinct-paths (! counterexample ∙ to-transp p)
 
--- Oh, yep, here we go.  It doesn't.  Darn.
 
-baseP2-loopspace-is-contr : is-contr (baseP2 == baseP2)
-baseP2-loopspace-is-contr = idp , lemma
-  where
-  lemma : {b : P2} (p : b == baseP2) -> path-to-baseP2 b == p
-  lemma idp = idp
+module FreeCirc where
+  FreeCirc = (A : Set) (a : A) (p : a == a) -> A
 
--- Here's a question
-question : path-to-baseP2 _ == path-in-P2
-question = {! !}
+  baseF : FreeCirc
+  baseF A a _ = a
 
+  loopF : baseF == baseF
+  loopF = λ= \A -> λ= \a -> λ= \p -> p
 
+  to-S¹ : FreeCirc -> S¹
+  to-S¹ c = c S¹ base loop
+
+  to-S¹-base-hom : to-S¹ baseF == base
+  to-S¹-base-hom = idp
+
+  to-S¹-loop-hom : ap to-S¹ loopF == loop
+  to-S¹-loop-hom = ap to-S¹ loopF
+                      =⟨ ap-∘ (\f -> f loop) (\f -> f S¹ base) loopF ⟩
+                   app= (ap (\f -> f S¹ base) loopF) loop
+                      =⟨ ap-∘ (\f -> f base) (\f -> f S¹) loopF     |in-ctx ap _ ⟩
+                   app= (app= (app= loopF S¹) base) loop
+                      =⟨ app=-β (\A -> λ= \(a : A) -> λ= \(p : a == a) -> p) S¹   |in-ctx (\ □ -> app= (app= □ base) loop)  ⟩
+                   app= (app= (λ= \(a : S¹) -> λ= \(p : a == a) -> p) base) loop
+                      =⟨ app=-β (\(a : S¹) -> λ= \(p : a == a) -> p) base  |in-ctx (\ □ -> app= □ loop) ⟩ 
+                   app= (λ= \(p : base == base) -> p) loop
+                      =⟨ app=-β (\(p : base == base) -> p) loop ⟩
+                   loop
+                      =∎
+
+  from-S¹ : S¹ -> FreeCirc
+  from-S¹ = S¹-rec baseF loopF
+
+  from-S¹-base-hom : from-S¹ base == baseF
+  from-S¹-base-hom = idp
+
+  from-S¹-loop-hom : ap from-S¹ loop == loopF
+  from-S¹-loop-hom = S¹Rec.loop-β baseF loopF
+
+  to-S¹-is-equiv : is-equiv to-S¹
+  to-S¹-is-equiv = is-eq to-S¹ from-S¹ to-from from-to
+    where
+    to-from : (b : S¹) -> to-S¹ (from-S¹ b) == b
+    to-from = S¹-elim idp {!!}
+
+    from-to : (f : FreeCirc) -> from-S¹ (to-S¹ f) == f
+    from-to f = {!{- S¹-rec baseF loopF (f S¹ base loop) == f -}!}
