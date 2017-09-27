@@ -176,24 +176,28 @@ no-idp-loop-for-not-path p = Bool-has-distinct-paths (! counterexample ∙ to-tr
 module FreeCirc where
   FreeCirc = (A : Set) (a : A) (p : a == a) -> A
 
-  baseF : FreeCirc
-  baseF A a _ = a
+  postulate
+    FreeCirc-freethm : (η : FreeCirc) {X Y : Set} {f : X -> Y} {x : X} {p : x == x} 
+                    -> f (η X x p) == η Y (f x) (ap f p)
 
-  loopF : baseF == baseF
-  loopF = λ= \A -> λ= \a -> λ= \p -> p
+  baseC : FreeCirc
+  baseC A a _ = a
+
+  loopC : baseC == baseC
+  loopC = λ= \A -> λ= \a -> λ= \p -> p
 
   to-S¹ : FreeCirc -> S¹
   to-S¹ c = c S¹ base loop
 
-  to-S¹-base-hom : to-S¹ baseF == base
+  to-S¹-base-hom : to-S¹ baseC == base
   to-S¹-base-hom = idp
 
-  to-S¹-loop-hom : ap to-S¹ loopF == loop
-  to-S¹-loop-hom = ap to-S¹ loopF
-                      =⟨ ap-∘ (\f -> f loop) (\f -> f S¹ base) loopF ⟩
-                   app= (ap (\f -> f S¹ base) loopF) loop
-                      =⟨ ap-∘ (\f -> f base) (\f -> f S¹) loopF     |in-ctx ap _ ⟩
-                   app= (app= (app= loopF S¹) base) loop
+  to-S¹-loop-hom : ap to-S¹ loopC == loop
+  to-S¹-loop-hom = ap to-S¹ loopC
+                      =⟨ ap-∘ (\f -> f loop) (\f -> f S¹ base) loopC ⟩
+                   app= (ap (\f -> f S¹ base) loopC) loop
+                      =⟨ ap-∘ (\f -> f base) (\f -> f S¹) loopC     |in-ctx ap _ ⟩
+                   app= (app= (app= loopC S¹) base) loop
                       =⟨ app=-β (\A -> λ= \(a : A) -> λ= \(p : a == a) -> p) S¹   |in-ctx (\ □ -> app= (app= □ base) loop)  ⟩
                    app= (app= (λ= \(a : S¹) -> λ= \(p : a == a) -> p) base) loop
                       =⟨ app=-β (\(a : S¹) -> λ= \(p : a == a) -> p) base  |in-ctx (\ □ -> app= □ loop) ⟩ 
@@ -203,13 +207,13 @@ module FreeCirc where
                       =∎
 
   from-S¹ : S¹ -> FreeCirc
-  from-S¹ = S¹-rec baseF loopF
+  from-S¹ = S¹-rec baseC loopC
 
-  from-S¹-base-hom : from-S¹ base == baseF
+  from-S¹-base-hom : from-S¹ base == baseC
   from-S¹-base-hom = idp
 
-  from-S¹-loop-hom : ap from-S¹ loop == loopF
-  from-S¹-loop-hom = S¹Rec.loop-β baseF loopF
+  from-S¹-loop-hom : ap from-S¹ loop == loopC
+  from-S¹-loop-hom = S¹Rec.loop-β baseC loopC
 
   to-S¹-is-equiv : is-equiv to-S¹
   to-S¹-is-equiv = is-eq to-S¹ from-S¹ to-from from-to
