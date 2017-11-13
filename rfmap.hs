@@ -23,7 +23,7 @@ fmapIso (Iso f f') = Iso (fmap f) (fmap f')
 -- `Functorize a f g` means that `a` appearing in the context of `f`
 -- is equivalent `g a` where `g` is a known `Functor` instance.
 -- For example:
---    Functorize Int [Maybe 42] (Compose [] Maybe)
+--    Functorize Int [Maybe Int] (Compose [] Maybe)
 -- holds.
 class (Functor g) => Functorize a f g | a f -> g, g a -> f where
     functorize :: Iso f (g a)
