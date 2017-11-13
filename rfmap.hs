@@ -27,15 +27,23 @@ instance Functorize Int Int Identity where
     functorize = Iso Identity runIdentity
 instance Functorize Char Char Identity where
     functorize = Iso Identity runIdentity
+-- And so on for every type...
+
+-- Note that no (Maybe a) (Maybe a) instance is possible.  Which means
+-- you cannot e.g.
+--   rfmap (maybe 0 id) [Just 1, Just 2]
+-- because rfmap will look "too deep" and then fail.
     
 instance (Functorize a f g) => Functorize a (Maybe f) (Compose Maybe g) where
     functorize = Iso Compose getCompose . fmapIso functorize
 instance (Functorize a f g) => Functorize a [f] (Compose [] g) where
     functorize = Iso Compose getCompose . fmapIso functorize
+-- And so on for every functor...
 
 rfmap :: (Functorize a f g, Functorize b f' g) => (a -> b) -> (f -> f')
 rfmap f = apply (inverse functorize) . fmap f . apply functorize
 
+-- These type annotations are required.  Was it worth it???
 check :: [[Maybe Int]]
 check = rfmap (+ (1 :: Int)) [[Just (1 :: Int),Just 2],[Nothing,Just 4,Just 5]]
 --[[Just 2,Just 3],[Nothing,Just 5,Just 6]]
