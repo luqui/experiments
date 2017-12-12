@@ -107,9 +107,12 @@ patternGame strings = do
                 else putStrLn "\ESC[1;31mNope!\ESC[0m" >> question
     question
 
+subfretboards :: [[Int]]
+subfretboards = [ [x..y] | x <- [1..5], y <- [x+1..6] ]
+
 randPatternGame :: IO ()
 randPatternGame = do
-    strings <- Rand.evalRandIO $ Rand.uniform [[1,2],[3,4],[5,6],[1,2,3],[4,5,6],[1,2,3,4,5,6]]
+    strings <- Rand.evalRandIO $ Rand.uniform subfretboards
     patternGame strings
 
 
@@ -128,6 +131,6 @@ degreeGame strings = do
 
 randDegreeGame :: IO ()
 randDegreeGame = do
-    strings <- Rand.evalRandIO $ Rand.uniform [[1,2],[3,4],[5,6],[1,2,3],[4,5,6],[1,2,3,4,5,6]]
+    strings <- Rand.evalRandIO $ Rand.uniform subfretboards
     degreeGame strings
 
