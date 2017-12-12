@@ -28,12 +28,26 @@ psetDLNoShare = toList . go
     go [] = DList.singleton ([],[])
     go (x:xs) = (second (x:) <$> go xs) <> (first (x:) <$> go xs)
 
+psetTail :: [a] -> [([a],[a])]
+psetTail = go [] []
+    where
+    go a b [] = [(a,b)]
+    go a b (x:xs) = go a (x:b) xs <> go (x:a) b xs
+
+psetTailDL :: [a] -> [([a],[a])]
+psetTailDL = toList . go [] []
+    where
+    go a b [] = DList.singleton (a,b)
+    go a b (x:xs) = go a (x:b) xs <> go (x:a) b xs
+
 main = defaultMain [
     bgroup "pset" [
         bench "list" $ nf pset [1..20::Int],
         bench "list (no share)" $ nf psetNoShare [1..20::Int],
         bench "dlist" $ nf psetDL [1..20::Int],
-        bench "dlist (no share)" $ nf psetDL [1..20::Int]
+        bench "dlist (no share)" $ nf psetDL [1..20::Int],
+        bench "tail" $ nf psetDL [1..20::Int],
+        bench "tail dlist" $ nf psetDL [1..20::Int]
     ]
   ]
 
@@ -41,30 +55,44 @@ main = defaultMain [
 $ ghc --make -O pset
 
 benchmarking pset/list
-time                 397.0 ms   (326.9 ms .. 444.0 ms)
-                     0.997 R²   (0.989 R² .. 1.000 R²)
-mean                 425.9 ms   (423.5 ms .. 430.4 ms)
-std dev              3.859 ms   (0.0 s .. 3.948 ms)
+time                 413.5 ms   (338.1 ms .. 455.8 ms)
+                     0.996 R²   (0.992 R² .. 1.000 R²)
+mean                 440.8 ms   (439.3 ms .. 442.2 ms)
+std dev              2.254 ms   (0.0 s .. 2.385 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
 benchmarking pset/list (no share)
-time                 1.307 s    (1.282 s .. 1.327 s)
+time                 1.421 s    (1.372 s .. 1.466 s)
                      1.000 R²   (1.000 R² .. 1.000 R²)
-mean                 1.315 s    (1.309 s .. 1.319 s)
-std dev              6.834 ms   (0.0 s .. 7.744 ms)
+mean                 1.389 s    (1.370 s .. 1.401 s)
+std dev              18.81 ms   (0.0 s .. 21.72 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
 benchmarking pset/dlist
-time                 379.8 ms   (327.2 ms .. 441.1 ms)
-                     0.997 R²   (0.989 R² .. 1.000 R²)
-mean                 382.6 ms   (373.2 ms .. 390.1 ms)
-std dev              11.81 ms   (0.0 s .. 13.07 ms)
+time                 420.8 ms   (358.8 ms .. 478.1 ms)
+                     0.997 R²   (0.990 R² .. 1.000 R²)
+mean                 419.1 ms   (404.6 ms .. 427.2 ms)
+std dev              12.81 ms   (0.0 s .. 14.13 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
 benchmarking pset/dlist (no share)
-time                 388.2 ms   (338.6 ms .. 416.7 ms)
-                     0.998 R²   (0.995 R² .. 1.000 R²)
-mean                 381.1 ms   (369.4 ms .. 387.6 ms)
-std dev              10.34 ms   (0.0 s .. 11.23 ms)
+time                 401.7 ms   (NaN s .. 410.2 ms)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 412.8 ms   (409.0 ms .. 415.0 ms)
+std dev              3.399 ms   (0.0 s .. 3.795 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking pset/tail
+time                 380.9 ms   (362.7 ms .. 397.7 ms)
+                     1.000 R²   (0.999 R² .. 1.000 R²)
+mean                 394.4 ms   (388.7 ms .. 397.3 ms)
+std dev              4.947 ms   (0.0 s .. 4.996 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking pset/tail dlist
+time                 385.3 ms   (NaN s .. 413.5 ms)
+                     0.999 R²   (0.996 R² .. 1.000 R²)
+mean                 391.3 ms   (385.6 ms .. 394.4 ms)
+std dev              5.001 ms   (0.0 s .. 5.374 ms)
 variance introduced by outliers: 19% (moderately inflated)
 -}
