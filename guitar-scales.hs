@@ -3,10 +3,13 @@
 import Data.Maybe (catMaybes)
 import Control.Applicative (liftA2)
 import Control.Arrow (second)
-import Control.Monad (forever, forM_)
+import Control.Monad (forever, forM_, filterM)
 import Control.Monad.Trans.State (state, evalState)
 import System.IO (hFlush, stdout)
+import Text.Read (readMaybe)
 import qualified Control.Monad.Random as Rand
+
+type Cloud = Rand.Rand Rand.StdGen
 
 data Position
     = Position { pName :: String, pFrets :: [[(Int,Int)]] }
@@ -110,6 +113,9 @@ patternGame strings = do
 subfretboards :: [[Int]]
 subfretboards = [ [x..y] | x <- [1..5], y <- [x+1..6] ]
 
+filterPosition :: [[a]] -> Cloud [[a]]
+filterPosition = (traverse.filterM) (const (Rand.uniform [False,True]))
+
 randPatternGame :: IO ()
 randPatternGame = do
     strings <- Rand.evalRandIO $ Rand.uniform subfretboards
@@ -123,8 +129,8 @@ degreeGame strings = do
             mapM_ putStrLn $ zipWith (++) (map show strings) (padRender 1 1 $ renderPosition (Just deg) (reverse $ map ((pFrets pos !!) . (6-)) strings))
             putStr $ "Degree of major? "
             hFlush stdout
-            answer <- readLn
-            if answer == deg
+            answer <- readMaybe <$> getLine
+            if answer == Just deg
                 then putStrLn "\ESC[1;32mYep!\ESC[0m"
                 else putStrLn "\ESC[1;31mNope!\ESC[0m" >> question
     question
@@ -134,3 +140,23 @@ randDegreeGame = do
     strings <- Rand.evalRandIO $ Rand.uniform subfretboards
     degreeGame strings
 
+
+fragmentGame :: [Int] -> IO ()
+fragmentGame strings = do
+    pos <- Rand.evalRandIO $ Rand.uniform positions
+    pos' <- Rand.evalRandIO . filterPosition . reverse . map ((pFrets pos !!) . (6-)) $ strings
+    (paddingL, paddingR) <- liftA2 (,) (Rand.uniform [0..2]) (Rand.uniform [0..2])
+    let question = do
+            mapM_ putStrLn $ zipWith (++) (map show strings) (padRender paddingL paddingR $ renderPosition Nothing pos')
+            putStr $ "Pattern? "
+            answer <- getLine
+            if answer == pName pos
+                then putStrLn "\ESC[1;32mYep!\ESC[0m"
+                else putStrLn "\ESC[1;31mNope!\ESC[0m" >> question
+    question
+
+fullFragmentGame :: IO ()
+fullFragmentGame = fragmentGame [1..6]
+
+
+main = forever fullFragmentGame
