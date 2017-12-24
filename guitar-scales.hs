@@ -69,6 +69,20 @@ positions = [
     }
   ]
 
+data Mode = Mode
+    { modeName :: String
+    , modeTransform :: Int -> Int
+    }
+
+modeMap :: [Mode]
+modeMap =
+    [ Mode "major" id
+    , Mode "minor" (mode 6)
+    , Mode "dorian" (mode 2)
+    ]
+    where
+    mode n d = (((d-1)+(n-1)) `mod` 7) + 1
+
 parseFrets :: Int -> [String] -> [[(Int,Int)]]
 parseFrets degree = annotate . reverse . map parseString
     where
@@ -122,15 +136,15 @@ randPatternGame = do
     patternGame strings
 
 
-degreeGame :: [Int] -> IO ()
-degreeGame strings = do
+degreeGame :: Mode -> [Int] -> IO ()
+degreeGame mode strings = do
     (pos,deg) <- Rand.evalRandIO $ liftA2 (,) (Rand.uniform positions) (Rand.uniform [1..7])
     let question = do
             mapM_ putStrLn $ zipWith (++) (map show strings) (padRender 1 1 $ renderPosition (Just deg) (reverse $ map ((pFrets pos !!) . (6-)) strings))
-            putStr $ "Degree of major? "
+            putStr $ "Degree of " ++ modeName mode ++ "? "
             hFlush stdout
             answer <- readMaybe <$> getLine
-            if answer == Just deg
+            if (modeTransform mode <$> answer) == Just deg
                 then putStrLn "\ESC[1;32mYep!\ESC[0m"
                 else putStrLn "\ESC[1;31mNope!\ESC[0m" >> question
     question
@@ -138,7 +152,8 @@ degreeGame strings = do
 randDegreeGame :: IO ()
 randDegreeGame = do
     strings <- Rand.evalRandIO $ Rand.uniform subfretboards
-    degreeGame strings
+    mode <- Rand.evalRandIO $ Rand.uniform modeMap
+    degreeGame mode strings
 
 
 fragmentGame :: [Int] -> IO ()
@@ -159,4 +174,4 @@ fullFragmentGame :: IO ()
 fullFragmentGame = fragmentGame [1..6]
 
 
-main = forever fullFragmentGame
+main = forever randDegreeGame
