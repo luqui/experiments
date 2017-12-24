@@ -74,14 +74,16 @@ data Mode = Mode
     , modeTransform :: Int -> Int
     }
 
+majorMode, minorMode, dorianMode :: Mode
+majorMode = Mode "major" id
+minorMode = Mode "minor" (modeTrans 6)
+dorianMode = Mode "dorian" (modeTrans 2)
+
 modeMap :: [Mode]
-modeMap =
-    [ Mode "major" id
-    , Mode "minor" (mode 6)
-    , Mode "dorian" (mode 2)
-    ]
-    where
-    mode n d = (((d-1)+(n-1)) `mod` 7) + 1
+modeMap = [ majorMode, minorMode, dorianMode ]
+
+modeTrans :: Int -> Int -> Int
+modeTrans n d = (((d-1)+(n-1)) `mod` 7) + 1
 
 parseFrets :: Int -> [String] -> [[(Int,Int)]]
 parseFrets degree = annotate . reverse . map parseString
@@ -152,7 +154,7 @@ degreeGame mode strings = do
 randDegreeGame :: IO ()
 randDegreeGame = do
     strings <- Rand.evalRandIO $ Rand.uniform subfretboards
-    mode <- Rand.evalRandIO $ Rand.uniform modeMap
+    mode <- return majorMode -- Rand.evalRandIO $ Rand.uniform modeMap
     degreeGame mode strings
 
 
