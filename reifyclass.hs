@@ -34,7 +34,7 @@ instance HasDict Eq where
 
 -- Then you use it like this:
 exampleEq :: Bool
-exampleEq = putDict (EqDict eq ((result.result) not eq)) $ \iso -> apply0 (to iso) 4 == apply0 (to iso) 6
+exampleEq = putDict (EqDict eq ((result.result) not eq)) $ \eqv -> apply0 (to eqv) 4 == apply0 (to eqv) 6
     where
     eq x y = x `mod` 2 == y `mod` 2
     result = (.)
@@ -52,4 +52,4 @@ instance HasDict Functor where
     putDict dict r = reify dict (\(_ :: Proxy p) -> r @(FCFunctor p _) (Eqv (NTS (NT0 FCFunctor)) (NTS (NT0 getFCFunctor))))
 
 exampleFunctor :: Maybe Int
-exampleFunctor = putDict (FunctorDict (\_ _ -> Nothing)) $ \iso -> apply0 (applyS (from iso)) (fmap succ (apply0 (applyS (to iso)) (Just 42)))
+exampleFunctor = putDict (FunctorDict (\_ _ -> Nothing)) $ \eqv -> apply0 (applyS (from eqv)) (fmap succ (apply0 (applyS (to eqv)) (Just 42)))
