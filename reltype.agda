@@ -260,7 +260,7 @@ Type X Y = X ≃ Y
 -- In fact, I wonder if that would happen naturally, and my above counterexample was actually just using
 -- --type-in-type to find its contradiction.
 
--- What if the const rule were enough:
+-- What if the const rule were enough   (in fact, (ΛX. Y) ≃ Y may be enough, using h X = ∀ x. f X x ≡ g X x)
 --
 --   (*) (ΛX. X -> Y) ≃ Y
 --        f   x = x ⊤ tt
