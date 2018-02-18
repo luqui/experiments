@@ -15,6 +15,7 @@ open import Data.Nat
 open import Data.Product hiding (∃)
 open import Data.Sum
 open import Function using (id)
+open import Relation.Nullary
 import Level
 open import Relation.Binary.PropositionalEquality
 
@@ -24,6 +25,13 @@ Rel X Y = X -> Y -> Set
 -- Combinators for building types-as-relations.
 Discrete : (A : Set) -> Rel A A
 Discrete _ x y = x ≡ y
+
+record _≃_ (A B : Set) : Set where
+  field
+    f : A -> B
+    g : B -> A
+    f-g : ∀ b -> f (g b) ≡ b
+    g-f : ∀ a -> g (f a) ≡ a
 
 infixr 50 _~>_
 _~>_ : {A A' B B' : Set} -> Rel A A' -> Rel B B' -> Rel (A -> B) (A' -> B')
@@ -41,7 +49,7 @@ _<⊎>_ : {A A' B B' : Set} -> Rel A A' -> Rel B B' -> Rel (A ⊎ B) (A' ⊎ B')
 Π {A} F = (x : A) -> F x
 
 Λ : {F F' : Set -> Set} -> ({A A' : Set} -> Rel A A' -> Rel (F A) (F' A')) -> Rel (Π F) (Π F')
-Λ F f g = {A A' : Set} (R : Rel A A') -> F R (f A) (g A')
+Λ F f g = {A A' : Set} -> (R : Rel A A') -> F R (f A) (g A')
 
 -- (A guess at this definition)
 ∃ : {F F' : Set -> Set} -> ({A A' : Set} -> Rel A A' -> Rel (F A) (F' A')) -> Rel (Σ Set F) (Σ Set F')
@@ -55,6 +63,9 @@ FreeTheorem R = ∀ f -> R f f
 -- Warm up: the only function of type (X : Set) -> X -> X  is the identity.
 poly-id-theorem : FreeTheorem (Λ (\X -> X ~> X)) -> (f : (A : Set) -> A -> A) (A : Set) (x : A) -> f A x ≡ x
 poly-id-theorem thm f A x = thm f (\y _ -> y ≡ x) x x refl
+
+
+
 
 
 -- Now let's do church numerals.
@@ -223,3 +234,59 @@ module SigmaAsPi (A : Set) (F : A -> Set) (ex : Extensionality _ _) where
 
    bij2 : (r : PiRepr) -> toPiRepr (fromPiRepr r) ≡ r
    bij2 r = ex (\x -> ex (\elim -> {!!}))
+
+
+-- -- Dependent types mess up standard parametricity, because terms can depend on types.  So even with
+-- -- Type's relation being equivalence/equality, we can get nonsense.
+-- Type : Rel Set Set
+-- Type X Y = X ≃ Y
+-- badΛ : FreeTheorem (Λ (\_ -> Type)) -> ⊥
+-- badΛ freethm = _≃_.f (freethm (\x -> x) {⊤} {⊥} (\_ _ -> ⊤)) tt
+-- -- Parhaps Λ needs an extra condition. 
+
+Type : Rel Set Set
+Type X Y = X ≃ Y
+Λ' : {F F' : Set -> Set} -> Rel Set Set -> ({A A' : Set} -> Rel A A' -> Rel (F A) (F' A')) -> Rel (Π F) (Π F')
+Λ' R F f g = {A A' : Set} -> R A A' -> (R : Rel A A') -> F R (f A) (g A')
+
+-- This weakened Λ' often gives consequences of univalence... always?  Possibly always.  Functions that return 
+-- types cannot be considered parametric.  I guess parametricity is really about type erasure: that type
+-- information will never enter term space.  It might be mathematically sufficient to declare that functions to
+-- Bool or Nat are always parametric, though massaging that into a form that could be useful for reasoning
+-- might be a challenge.
+
+-- It makes me think of "parametricity levels" similar to homotopy levels.  Like, if you quantify over something,
+-- what is its reach.  E.g. Quantifying over Set₁ into Set should also have a parametricity law.  
+-- In fact, I wonder if that would happen naturally, and my above counterexample was actually just using
+-- --type-in-type to find its contradiction.
+
+-- What if the const rule were enough:
+--   (*) (ΛX. X -> Y) ≃ Y
+--        f   x = x ⊤ tt
+--        f⁻¹ y = (\_ _ -> y)
+
+
+-- Suppose there were two unequal functions f g : ΛX. X -> X
+-- Define h : Λ(X : Set₁). X -> Set
+--        h X x = f X x ≡ g X x
+--
+-- Then it is contradictory for there to be no A,a such that h A a == ⊥.  However,
+-- the (universe-corrected) const rule gives us
+--
+--        e : (Λ(X : Set₁). X -> Set) ≃ Set
+-- 
+-- e⁻¹ (e h) A a = e⁻¹ (h ⊤ tt) A a
+--               = e⁻¹ (f ⊤ tt ≡ g ⊤ tt) A a
+--               = e⁻¹ (tt ≡ tt) A a     -- by ⊤ contractible
+--               = tt ≡ tt
+--
+-- But ALSO
+--
+-- e⁻¹ (e h) A a = (e⁻¹ ∘ e) h A a
+--               = idf h A a
+--               = h A a
+--               = ⊥
+--
+-- A contradiction.  So the const rule is enough to prove that there are not two distinct
+-- functions of type Λ(X : Set₁). X -> X, but perhaps yet not enough to prove that there is
+-- only one.
