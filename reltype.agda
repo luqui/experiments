@@ -292,4 +292,20 @@ Type X Y = X ≃ Y
 -- Thus by transporting refl : tt ≡ tt along this equivalence, we show that f A a ≡ g A a, as
 -- long as is in at least universe Set₁ (because we used the const rule at universe Set).
 --
--- 
+-- ----
+--
+--  f : (Λ X. X -> X × X)
+--    fst ∘ f  is unique
+--    snd ∘ f  is unique
+--  so f is unique by universal property.
+--
+-- g : (Λ X. X × X -> Y) ≃ Y  by composing with f  (probably, skipped the details).
+--
+-- -----
+--
+-- f : (Λ X. X -> X -> X)
+--
+-- Let h : Λ X. X -> X -> Set
+--     h X x y = (f X x y ≡ x) ⊔ (f X x y ≡ y)
+--
+-- (continue in this fashion)
