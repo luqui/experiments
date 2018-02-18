@@ -261,20 +261,22 @@ Type X Y = X ≃ Y
 -- --type-in-type to find its contradiction.
 
 -- What if the const rule were enough:
+--
 --   (*) (ΛX. X -> Y) ≃ Y
 --        f   x = x ⊤ tt
 --        f⁻¹ y = (\_ _ -> y)
-
-
--- Suppose there were two unequal functions f g : ΛX. X -> X
+--
+-- Given two functions f g : ΛX. X -> X
+-- 
 -- Define h : Λ(X : Set₁). X -> Set
 --        h X x = f X x ≡ g X x
 --
--- Then it is contradictory for there to be no A,a such that h A a == ⊥.  However,
--- the (universe-corrected) const rule gives us
+-- The (universe-corrected) const rule gives us
 --
 --        e : (Λ(X : Set₁). X -> Set) ≃ Set
--- 
+--
+-- Let A : Set₁ and a : A.
+--
 -- e⁻¹ (e h) A a = e⁻¹ (h ⊤ tt) A a
 --               = e⁻¹ (f ⊤ tt ≡ g ⊤ tt) A a
 --               = e⁻¹ (tt ≡ tt) A a     -- by ⊤ contractible
@@ -285,8 +287,9 @@ Type X Y = X ≃ Y
 -- e⁻¹ (e h) A a = (e⁻¹ ∘ e) h A a
 --               = idf h A a
 --               = h A a
---               = ⊥
+--               = f A a ≡ g A a
 --
--- A contradiction.  So the const rule is enough to prove that there are not two distinct
--- functions of type Λ(X : Set₁). X -> X, but perhaps yet not enough to prove that there is
--- only one.
+-- Thus by transporting refl : tt ≡ tt along this equivalence, we show that f A a ≡ g A a, as
+-- long as is in at least universe Set₁ (because we used the const rule at universe Set).
+--
+-- 
