@@ -82,10 +82,24 @@ wait s = threadDelay (floor (10^6 * s))
 enter :: IO ()
 enter = ignore getLine
 
+randomRhythm :: Int -> Int -> IO ()
+randomRhythm lo hi = do
+    divs <- uniform [lo..hi]
+    beat <- evalRandIO $ concat <$> bar [divs]
+    if all id beat || all not beat 
+        then randomRhythm lo hi 
+        else putStrLn $ renderBar [beat]
+
 randomGame :: [Int] -> IO () ->  IO () 
 randomGame divs btw = game btw  =<< evalRandIO (repeatM (renderBar <$> bar divs))
 
 grayGame :: [Int] -> IO () -> IO ()
 grayGame divs btw = game btw . getGray $ renderBar <$> bar divs
 
-
+help :: IO ()
+help = do
+    putStrLn $ "grayGame [4] (wait 10)"
+    putStrLn $ "randomGame [4] enter"
+    putStrLn $ "renderBar <$> bar [4]"
+    putStrLn $ "randomRhythm 3 8"
+    

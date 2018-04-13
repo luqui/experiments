@@ -266,8 +266,8 @@ Type X Y = X ≃ Y
 --        f   x = x ⊤ tt
 --        f⁻¹ y = (\_ _ -> y)
 --
--- Given two functions f g : ΛX. X -> X
--- 
+-- Given two functions f g : ΛX. X -> X.
+--
 -- Define h : Λ(X : Set₁). X -> Set
 --        h X x = f X x ≡ g X x
 --
