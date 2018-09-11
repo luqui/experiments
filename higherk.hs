@@ -10,10 +10,10 @@ import Data.Type.Equality
 type family (~>) :: k -> k -> Type
 type instance (~>) = (->)
 newtype NT (a :: j -> k) (b :: j -> k) 
-    = NT { applyNT :: forall x. Category ((~>) :: k -> k -> Type) => a x ~> b x }
+    = NT { applyNT :: forall x. a x ~> b x }
 type instance (~>) = NT
 
-instance Category NT where
+instance (Category ((~>) :: k -> k -> Type)) => Category (NT :: (j -> k) -> (j -> k) -> Type) where
     id = NT id
     NT g . NT f = NT (g . f)
 
@@ -32,7 +32,7 @@ promote2_law :: forall f x y z. f (x z) (y z) :~: Promote2 f x y z
 promote2_law = unsafeCoerce Refl
 
 -- Polykinded products!
-class Products k where
+class (Category ((~>) :: k -> k -> Type)) => Products k where
     type (:*:) :: k -> k -> k
     fstP :: forall (a :: k) (b :: k). (a :*: b) ~> a
     sndP :: forall (a :: k) (b :: k). (a :*: b) ~> b
