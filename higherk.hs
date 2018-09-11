@@ -1,25 +1,37 @@
 {-# OPTIONS -fdefer-type-errors #-}
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, TypeOperators, RankNTypes, GADTs, TypeApplications, ScopedTypeVariables, UndecidableInstances, MultiParamTypeClasses, TypeInType, TypeSynonymInstances, FlexibleInstances, InstanceSigs #-}
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, TypeOperators, RankNTypes, GADTs, TypeApplications, ScopedTypeVariables, UndecidableInstances, MultiParamTypeClasses, TypeInType, TypeSynonymInstances, FlexibleInstances, InstanceSigs, FlexibleContexts #-}
 
+import Prelude hiding (id, (.))
+import Control.Category
 import Data.Kind (Type)
 import Unsafe.Coerce
 import Data.Type.Equality
 
 type family (~>) :: k -> k -> Type
 type instance (~>) = (->)
-newtype NT a b = NT { applyNT :: forall x. a x ~> b x }
+newtype NT (a :: j -> k) (b :: j -> k) 
+    = NT { applyNT :: forall x. Category ((~>) :: k -> k -> Type) => a x ~> b x }
 type instance (~>) = NT
 
+instance Category NT where
+    id = NT id
+    NT g . NT f = NT (g . f)
+
+-- Example of higher-kinded natrual transformations.
 left :: (,) ~> Either
 left = NT (NT (Left . fst))
 
+right :: (,) ~> Either
+right = NT (NT (Right . snd))
+
+
+-- An "axiomatic type"
 type family Promote2 :: (j -> k -> l) -> (a -> j) -> (a -> k) -> (a -> l) where
 
 promote2_law :: forall f x y z. f (x z) (y z) :~: Promote2 f x y z
 promote2_law = unsafeCoerce Refl
 
-data Proxy a = Proxy
-
+-- Polykinded products!
 class Products k where
     type (:*:) :: k -> k -> k
     fstP :: forall (a :: k) (b :: k). (a :*: b) ~> a
@@ -47,7 +59,14 @@ fstP1 = castWith (Refl ~% promote2_law @(:*:) @a @b @x ~% Refl) fstP
 sndP1 :: forall (a :: j -> k) (b :: j -> k) (x :: j). Products k => (a :*: b) x ~> b x
 sndP1 = castWith (Refl ~% promote2_law @(:*:) @a @b @x ~% Refl) sndP
 
-pair1 :: forall (a :: j -> k) (b :: j -> k) (c :: j -> k) (x :: j). Products k => 
+pair1 :: forall (a :: j -> k) (b :: j -> k) (c :: j -> k) (x :: j). 
+         (Products k, Category ((~>) :: k -> k -> Type)) =>
          (a ~> b) -> (a ~> c) -> a x ~> (b :*: c) x
 pair1 f g = castWith (Refl ~% Refl ~% promote2_law @(:*:) @b @c @x) (pair (applyNT f) (applyNT g))
 
+
+example :: Either Int Int
+example = applyNT (applyNT mor) (1,2)
+    where
+    mor :: (,) ~> Either
+    mor = fstP . pair left right
