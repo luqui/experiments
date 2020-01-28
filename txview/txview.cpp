@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <set>
+#include <functional>
 
 
 template<class T> class TxPtr;
@@ -11,7 +12,7 @@ class RefreshListener
 {
 public:
     virtual ~RefreshListener() = default;
-    virtual void refresh(Reader&) = 0;
+    virtual void refresh() = 0;
 };
 
 class Reader
@@ -108,10 +109,10 @@ class TxPtr
 {
     friend class Writer;
 public:
-    TxPtr()
+    TxPtr() : m_ctrl(new ControlBlock)
     { }
 
-    TxPtr(std::unique_ptr<T> p) : m_value(p.release())
+    TxPtr(std::unique_ptr<T> p) : m_ctrl(new ControlBlock { std::move(p), {} })
     { }
 
     // Copying is allowed, and it does a shallow pointer copy (with GC).
@@ -120,7 +121,7 @@ public:
     const T* read(Reader& reader) const
     {
         reader.logRead<T>(this);
-        return m_value.get();
+        return m_ctrl->value.get();
     }
 
     const T* read(Writer& writer) const
@@ -136,35 +137,69 @@ public:
         {
             return value;
         }
-        else if (!m_value)
+        else if (!m_ctrl->value)
         {
             return nullptr; // XXX logRead?
         }
         else
         {
-            return writer.addLog<T>(this, std::make_unique<T>(*m_value));
+            return writer.addLog<T>(this, std::make_unique<T>(*m_ctrl->value));
         }
     }
 
     void addWatch(RefreshListener* listener)
     {
-        m_watches.insert(listener);
+        m_ctrl->watches.insert(listener);
     }
 
     void notify()
     {
-        std::set<RefreshListener*> watches = m_watches;
-        m_watches.clear();  // XXX correct?
+        std::set<RefreshListener*> watches = m_ctrl->watches;
+        m_ctrl->watches.clear();  // XXX correct?
         for (auto w : watches)
         {
-            Reader reader(w);
-            w->refresh(reader);
+            w->refresh();
         }
     }
 
+    operator bool() { return static_cast<bool>(m_ctrl->value); }
+
 private:
-    std::shared_ptr<T> m_value;
-    std::set<RefreshListener*> m_watches;
+    struct ControlBlock
+    {
+        std::unique_ptr<T> value;
+        std::set<RefreshListener*> watches;
+    };
+
+    std::shared_ptr<ControlBlock> m_ctrl;
+};
+
+template<class T>
+class ModelTracker : public RefreshListener
+{
+public:
+    ModelTracker(const TxPtr<T>& ptr) : ptr(ptr)
+    { }
+
+    void listen(const std::function<void(Reader&)>& cb)
+    {
+        m_cb = cb;
+        Reader reader(this);
+        m_cb(reader);
+    }
+
+    void refresh() override
+    {
+        Reader reader(this);
+        if (m_cb)
+        {
+            m_cb(reader);
+        }
+    }
+
+    const TxPtr<T>& ptr;
+private:
+    std::function<void(Reader&)> m_cb;
 };
 
 template<class T>
@@ -192,7 +227,7 @@ void* Writer::LogEnt<T>::lookup(void* needle) const
 template<class T>
 void Writer::LogEnt<T>::commit()
 {
-    ptr->m_value.reset(value.release());
+    ptr->m_ctrl->value.reset(value.release());
 }
 
 template<class T>
@@ -212,38 +247,59 @@ struct Tree
     TxPtr<Tree> right;
 };
 
-struct NodeView : public RefreshListener
+struct NodeView
 {
-    NodeView(TxPtr<Tree> ptr)
-    : model(ptr)
+    NodeView(TxPtr<Tree> ptr) : m_model(ptr)
     {
         static int ctr = 0;
-        id = ctr++;
+        m_id = ctr++;
+
+        m_model.listen([&](Reader& tx)
+        {
+            this->refresh(tx);
+        });
     }
 
-    void refresh(Reader& reader) override
+    void refresh(Reader& reader)
     {
-        std::cout << "REFRESH NodeView " << id << "\n";
+        std::cout << "REFRESH NodeView " << m_id << "\n";
         // TODO detect if each child changed?
-        left.reset(new NodeView(model.read(reader)->left));
-        right.reset(new NodeView(model.read(reader)->right));
+        if (auto left = m_model.ptr.read(reader)->left)
+        {
+            m_left.reset(new NodeView(left));
+        }
+        else{
+            m_left.reset(nullptr);
+        }
+
+        if (auto right = m_model.ptr.read(reader)->right)
+        {
+            m_right.reset(new NodeView(m_model.ptr.read(reader)->right));
+        }
+        else
+        {
+            m_right.reset(nullptr);
+        }
     }
 
-    void show(int indent)
+    /*
+    void show(int indent, Reader& reader)
     {
         Reader tx(this);
         for (int i = 0; i < indent; i++)
         {
             std::cout << "  ";
         }
-        const Tree* modelp = model.read(tx);
+        const Tree* modelp = m_model.read(tx);
         std::cout << modelp->data << "\n";
     }
+     */
 
-    int id;
-    TxPtr<Tree> model;
-    std::unique_ptr<NodeView> left;
-    std::unique_ptr<NodeView> right;
+    int m_id;
+
+    ModelTracker<Tree> m_model;
+    std::unique_ptr<NodeView> m_left;
+    std::unique_ptr<NodeView> m_right;
 };
 
 void insert(Writer& tx, TxPtr<Tree>& root, int value)
@@ -270,7 +326,7 @@ int main()
 
     while (true)
     {
-        view.show(0);
+        //view.show(0);
 
         std::cout << "Insert? ";
         int x;
