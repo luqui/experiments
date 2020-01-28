@@ -1,33 +1,33 @@
 #include <memory>
 #include <vector>
 #include <iostream>
+#include <set>
 
 
 template<class T> class TxPtr;
+class Reader;
+
+class RefreshListener
+{
+public:
+    virtual ~RefreshListener() = default;
+    virtual void refresh(Reader&) = 0;
+};
 
 class Reader
 {
 public:
-    struct LogEntBase
-    {
-        virtual ~LogEntBase() = default;
-    };
+    Reader(RefreshListener* watch) : m_watch(watch)
+    { }
 
     template<class T>
-    struct LogEnt : public LogEntBase
+    void logRead(const TxPtr<T>* ptr)
     {
-        LogEnt(const TxPtr<T>* ptr) : ptr(ptr) { }
-
-        const TxPtr<T>* ptr;
-    };
-
-    template<class T>
-    void addLog(const TxPtr<T>* ptr)
-    {
-        m_readLog.push_back(std::unique_ptr<LogEntBase>(new LogEnt<T> { ptr }));
+        // XXX yuck const_cast
+        const_cast<TxPtr<T>*>(ptr)->addWatch(m_watch);
     }
 private:
-    std::vector<std::unique_ptr<LogEntBase>> m_readLog;
+    RefreshListener* m_watch;
 };
 
 class Writer
@@ -38,6 +38,7 @@ public:
         virtual ~LogEntBase() = default;
         virtual void commit() = 0;
         virtual void* lookup(void*) const = 0;
+        virtual void notify() = 0;
     };
     
     template<class T>
@@ -47,6 +48,7 @@ public:
 
         void commit() override;
         void* lookup(void* needle) const override;
+        void notify() override;
 
         TxPtr<T>* ptr;
         std::unique_ptr<T> value;
@@ -80,9 +82,15 @@ public:
     void commit()
     {
         // TODO lock
+        std::vector<RefreshListener*> listeners;
         for (auto& i : m_writeLog)
         {
             i->commit();
+        }
+        // Should we clear the log here?
+        for (auto& i  : m_writeLog)
+        {
+            i->notify();
         }
         m_writeLog.clear();
     }
@@ -100,6 +108,9 @@ class TxPtr
 {
     friend class Writer;
 public:
+    TxPtr()
+    { }
+
     TxPtr(std::unique_ptr<T> p) : m_value(p.release())
     { }
 
@@ -108,7 +119,7 @@ public:
 
     const T* read(Reader& reader) const
     {
-        reader.addLog<T>(this);
+        reader.logRead<T>(this);
         return m_value.get();
     }
 
@@ -125,15 +136,36 @@ public:
         {
             return value;
         }
-        else {
+        else if (!m_value)
+        {
+            return nullptr; // XXX logRead?
+        }
+        else
+        {
             return writer.addLog<T>(this, std::make_unique<T>(*m_value));
+        }
+    }
+
+    void addWatch(RefreshListener* listener)
+    {
+        m_watches.insert(listener);
+    }
+
+    void notify()
+    {
+        std::set<RefreshListener*> watches = m_watches;
+        m_watches.clear();  // XXX correct?
+        for (auto w : watches)
+        {
+            Reader reader(w);
+            w->refresh(reader);
         }
     }
 
 private:
     std::shared_ptr<T> m_value;
+    std::set<RefreshListener*> m_watches;
 };
-
 
 template<class T>
 T* Writer::addLog(TxPtr<T> *ptr, std::unique_ptr<T> clone)
@@ -163,41 +195,91 @@ void Writer::LogEnt<T>::commit()
     ptr->m_value.reset(value.release());
 }
 
-
-
-struct ModelThingA
+template<class T>
+void Writer::LogEnt<T>::notify()
 {
-    int x = 0;
+    ptr->notify();
+}
+
+
+struct Tree
+{
+    Tree(int data) : data(data)
+    { }
+
+    int data;
+    TxPtr<Tree> left;
+    TxPtr<Tree> right;
 };
 
-struct ModelThingB
+struct NodeView : public RefreshListener
 {
-    int y = 0;
-    TxPtr<ModelThingA> thingA = std::make_unique<ModelThingA>();
+    NodeView(TxPtr<Tree> ptr)
+    : model(ptr)
+    {
+        static int ctr = 0;
+        id = ctr++;
+    }
+
+    void refresh(Reader& reader) override
+    {
+        std::cout << "REFRESH NodeView " << id << "\n";
+        // TODO detect if each child changed?
+        left.reset(new NodeView(model.read(reader)->left));
+        right.reset(new NodeView(model.read(reader)->right));
+    }
+
+    void show(int indent)
+    {
+        Reader tx(this);
+        for (int i = 0; i < indent; i++)
+        {
+            std::cout << "  ";
+        }
+        const Tree* modelp = model.read(tx);
+        std::cout << modelp->data << "\n";
+    }
+
+    int id;
+    TxPtr<Tree> model;
+    std::unique_ptr<NodeView> left;
+    std::unique_ptr<NodeView> right;
 };
 
-struct Model
+void insert(Writer& tx, TxPtr<Tree>& root, int value)
 {
-    TxPtr<ModelThingB> thingB = std::make_unique<ModelThingB>();
-};
-
-TxPtr<Model> MODEL = std::make_unique<Model>();
-
-void readTest()
-{
-    Reader r;
-    // int x = r.read(r.read(r.read(MODEL)->thingB)->thingA)->x;
-    std::cout << "READ " << MODEL.read(r)->thingB.read(r)->thingA.read(r)->x << "\n";
+    Tree* modelp = root.write(tx);
+    if (!modelp)
+    {
+        root = TxPtr<Tree>(std::make_unique<Tree>(value));
+    }
+    else if (value <= modelp->data)
+    {
+        insert(tx, modelp->left, value);
+    }
+    else
+    {
+        insert(tx, modelp->right, value);
+    }
 }
 
 int main()
 {
-    readTest();
+    TxPtr<Tree> model (std::make_unique<Tree>(0));
+    NodeView view (model);
 
-    Writer w;
-    MODEL.write(w)->thingB.write(w)->thingA.write(w)->x = 1;
-    readTest();
-    std::cout << "WRITE " << MODEL.read(w)->thingB.read(w)->thingA.read(w)->x << "\n";
-    w.commit();
-    readTest();
+    while (true)
+    {
+        view.show(0);
+
+        std::cout << "Insert? ";
+        int x;
+        std::cin >> x;
+
+        {
+            Writer tx;
+            insert(tx, model, x);
+            tx.commit();
+        }
+    }
 }
