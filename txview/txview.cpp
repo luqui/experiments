@@ -164,7 +164,7 @@ public:
 
     operator bool() { return static_cast<bool>(m_ctrl->value); }
 
-private:
+//private:
     struct ControlBlock
     {
         std::unique_ptr<T> value;
@@ -197,7 +197,7 @@ public:
         }
     }
 
-    const TxPtr<T>& ptr;
+    TxPtr<T> ptr;
 private:
     std::function<void(Reader&)> m_cb;
 };
@@ -249,10 +249,11 @@ struct Tree
 
 struct NodeView
 {
-    NodeView(TxPtr<Tree> ptr) : m_model(ptr)
+    NodeView(const TxPtr<Tree>& ptr) : m_model(ptr)
     {
         static int ctr = 0;
         m_id = ctr++;
+        std::cout << "CREATE NodeView " << m_id << "\n";
 
         m_model.listen([&](Reader& tx)
         {
@@ -274,7 +275,7 @@ struct NodeView
 
         if (auto right = m_model.ptr.read(reader)->right)
         {
-            m_right.reset(new NodeView(m_model.ptr.read(reader)->right));
+            m_right.reset(new NodeView(right));
         }
         else
         {
@@ -282,18 +283,22 @@ struct NodeView
         }
     }
 
-    /*
-    void show(int indent, Reader& reader)
+    void show(int indent)
     {
-        Reader tx(this);
         for (int i = 0; i < indent; i++)
         {
             std::cout << "  ";
         }
-        const Tree* modelp = m_model.read(tx);
-        std::cout << modelp->data << "\n";
+        std::cout << m_model.ptr.m_ctrl->value->data << "\n";
+        if (m_left)
+        {
+            m_left->show(indent+1);
+        }
+        if (m_right)
+        {
+            m_right->show(indent+1);
+        }
     }
-     */
 
     int m_id;
 
@@ -319,6 +324,15 @@ void insert(Writer& tx, TxPtr<Tree>& root, int value)
     }
 }
 
+void check(const TxPtr<Tree>& p)
+{
+    if (p.m_ctrl->value)
+    {
+        check(p.m_ctrl->value->left);
+        check(p.m_ctrl->value->right);
+    }
+}
+
 int main()
 {
     TxPtr<Tree> model (std::make_unique<Tree>(0));
@@ -326,7 +340,8 @@ int main()
 
     while (true)
     {
-        //view.show(0);
+        check(model);
+        view.show(0);
 
         std::cout << "Insert? ";
         int x;
@@ -335,7 +350,9 @@ int main()
         {
             Writer tx;
             insert(tx, model, x);
+            check(model);
             tx.commit();
+            check(model);
         }
     }
 }
