@@ -18,7 +18,7 @@ public:
 class Reader
 {
 public:
-    Reader(RefreshListener* watch) : m_watch(watch)
+    Reader(std::shared_ptr<RefreshListener> watch) : m_watch(watch)
     { }
 
     template<class T>
@@ -28,7 +28,7 @@ public:
         const_cast<TxPtr<T>*>(ptr)->addWatch(m_watch);
     }
 private:
-    RefreshListener* m_watch;
+    std::shared_ptr<RefreshListener> m_watch;
 };
 
 class Writer
@@ -88,12 +88,12 @@ public:
         {
             i->commit();
         }
-        // Should we clear the log here?
         for (auto& i  : m_writeLog)
         {
             i->notify();
+            m_writeLog.clear();
+            break;
         }
-        m_writeLog.clear();
     }
 
     void abort()
@@ -147,18 +147,19 @@ public:
         }
     }
 
-    void addWatch(RefreshListener* listener)
+    void addWatch(std::shared_ptr<RefreshListener> listener)
     {
         m_ctrl->watches.insert(listener);
     }
 
     void notify()
     {
-        std::set<RefreshListener*> watches = m_ctrl->watches;
+        auto watches = m_ctrl->watches;
         m_ctrl->watches.clear();  // XXX correct?
         for (auto w : watches)
         {
-            w->refresh();
+            w->refresh();  // The crash here is due to a deleted listener being called.
+                           // We need smarter automatic
         }
     }
 
@@ -168,38 +169,58 @@ public:
     struct ControlBlock
     {
         std::unique_ptr<T> value;
-        std::set<RefreshListener*> watches;
+        std::set<std::shared_ptr<RefreshListener>> watches;
     };
 
     std::shared_ptr<ControlBlock> m_ctrl;
 };
 
 template<class T>
-class ModelTracker : public RefreshListener
+class ModelTracker
 {
 public:
-    ModelTracker(const TxPtr<T>& ptr) : ptr(ptr)
+    ModelTracker(const TxPtr<T>& ptr) : ptr(ptr), m_listener(new Listener(this))
     { }
+
+    ~ModelTracker()
+    {
+        m_listener->m_backptr = nullptr;
+    }
 
     void listen(const std::function<void(Reader&)>& cb)
     {
         m_cb = cb;
-        Reader reader(this);
-        m_cb(reader);
+        refresh();
     }
 
-    void refresh() override
+    TxPtr<T> ptr;
+private:
+    void refresh()
     {
-        Reader reader(this);
+        Reader reader(m_listener);
         if (m_cb)
         {
             m_cb(reader);
         }
     }
 
-    TxPtr<T> ptr;
-private:
+    struct Listener : public RefreshListener
+    {
+        Listener(ModelTracker* backptr) : m_backptr(backptr)
+        { }
+
+        void refresh() override
+        {
+            if (m_backptr)
+            {
+                m_backptr->refresh();
+            }
+        }
+        ModelTracker* m_backptr;
+    };
+
     std::function<void(Reader&)> m_cb;
+    std::shared_ptr<Listener> m_listener;
 };
 
 template<class T>
@@ -227,7 +248,7 @@ void* Writer::LogEnt<T>::lookup(void* needle) const
 template<class T>
 void Writer::LogEnt<T>::commit()
 {
-    ptr->m_ctrl->value.reset(value.release());
+    ptr->m_ctrl->value.swap(value);
 }
 
 template<class T>
@@ -263,9 +284,10 @@ struct NodeView
 
     void refresh(Reader& reader)
     {
-        std::cout << "REFRESH NodeView " << m_id << "\n";
+        const Tree* node = m_model.ptr.read(reader);
+        std::cout << "REFRESH NodeView " << m_id << " = " << node->data << "\n";
         // TODO detect if each child changed?
-        if (auto left = m_model.ptr.read(reader)->left)
+        if (auto left = node->left)
         {
             m_left.reset(new NodeView(left));
         }
@@ -273,7 +295,7 @@ struct NodeView
             m_left.reset(nullptr);
         }
 
-        if (auto right = m_model.ptr.read(reader)->right)
+        if (auto right = node->right)
         {
             m_right.reset(new NodeView(right));
         }
