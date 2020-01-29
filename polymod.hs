@@ -81,3 +81,12 @@ Try
 >>> putStrLn $ multTable (readBin "111") 2
 -}
 
+
+showBase :: Integer -> Integer -> String
+showBase b = map showb . reverse . tobs
+    where
+    showb x = "0123456789abcdefghijklmnopqrstuvwxyz" !! fromIntegral x
+    tobs 0 = []
+    tobs x = r : tobs d
+        where
+        (d,r) = x `divMod` b

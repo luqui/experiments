@@ -16,7 +16,7 @@ data UnambTree
     | Branch ThreadId (MVar UnambTree) (MVar UnambTree)
 
 newtype Engine a = Engine { runEngine :: ReaderT (MVar UnambTree) IO a }
-    deriving (Functor, Monad, MonadIO)
+    deriving (Functor, Applicative, Monad, MonadIO)
 
 localRoot :: MVar UnambTree -> Engine a -> Engine a
 localRoot root e = Engine . ReaderT $ \_ -> runReaderT (runEngine e) root
@@ -77,10 +77,11 @@ infiniteLoop = forever tick
 tick :: Engine ()
 tick = liftIO yield
 
-
+instance Semigroup (Engine a) where
+    (<>) = unamb
+    
 instance Monoid (Engine a) where
     mempty = bottom
-    mappend = unamb
 
 pfold :: (Monoid m) => [m] -> m 
 pfold [] = mempty
