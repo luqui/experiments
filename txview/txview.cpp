@@ -24,8 +24,7 @@ public:
     template<class T>
     void logRead(const TxPtr<T>* ptr)
     {
-        // XXX yuck const_cast
-        const_cast<TxPtr<T>*>(ptr)->addWatch(m_watch);
+        ptr->addWatch(m_watch);
     }
 private:
     std::shared_ptr<RefreshListener> m_watch;
@@ -270,6 +269,10 @@ void Writer::LogEnt<T>::notify()
 }
 
 
+///////////////////
+// Example Usage //
+///////////////////
+
 struct Tree
 {
     Tree(int data) : data(data)
@@ -368,15 +371,6 @@ void insert(Writer& tx, const TxPtr<Tree>& root, int value)
     }
 }
 
-void check(const TxPtr<Tree>& p)
-{
-    if (p.m_ctrl->value)
-    {
-        check(p.m_ctrl->value->left);
-        check(p.m_ctrl->value->right);
-    }
-}
-
 int main()
 {
     TxPtr<Tree> model (std::make_unique<Tree>(0));
@@ -384,7 +378,6 @@ int main()
 
     while (true)
     {
-        check(model);
         view.show(0);
 
         std::cout << "Insert? ";
@@ -394,9 +387,7 @@ int main()
         {
             Writer tx;
             insert(tx, model, x);
-            check(model);
             tx.commit();
-            check(model);
         }
     }
 }
