@@ -45,13 +45,15 @@ public:
     template<class T>
     struct LogEnt : public LogEntBase
     {
-        LogEnt(TxPtr<T>* ptr, std::unique_ptr<T> value) : ptr(ptr), value(std::move(value)) { }
+        LogEnt(std::shared_ptr<typename TxPtr<T>::ControlBlock> ptr, std::unique_ptr<T> value)
+                : ptr(ptr), value(std::move(value))
+        { }
 
         void commit() override;
         void* lookup(void* needle) const override;
         void notify() override;
 
-        TxPtr<T>* ptr;
+        std::shared_ptr<typename TxPtr<T>::ControlBlock> ptr;
         std::unique_ptr<T> value;
     };
 
@@ -65,14 +67,14 @@ public:
     }
 
     template <class T>
-    T* addLog(TxPtr<T>* ptr, std::unique_ptr<T> clone);
+    T* addLog(const std::shared_ptr<typename TxPtr<T>::ControlBlock>& ptr, std::unique_ptr<T> clone);
 
     template<class T>
-    T* lookup(TxPtr<T>* ptr)
+    T* lookup(const std::shared_ptr<typename TxPtr<T>::ControlBlock>& ptr)
     {
         for (auto& i : m_writeLog)
         {
-            if (void* r = i->lookup(ptr))
+            if (void* r = i->lookup(ptr.get()))
             {
                 return static_cast<T*>(r);
             }
@@ -126,14 +128,20 @@ public:
 
     const T* read(Writer& writer) const
     {
-        // TODO: I think Writer should have a "read-only" log, so we don't have to unnecessarily clone.
-        return const_cast<const T*>(const_cast<TxPtr*>(this)->write(writer));
+        if (const T* value = writer.lookup<T>(m_ctrl))
+        {
+            return value;
+        }
+        else
+        {
+            return m_ctrl->value.get();
+        }
     }
 
-    T* write(Writer& writer)
+    T* write(Writer& writer) const
     {
         // XXX what if T is abstract?  should use m_value->shallowClone()
-        if (T* value = writer.lookup(this))
+        if (T* value = writer.lookup<T>(m_ctrl))
         {
             return value;
         }
@@ -143,33 +151,37 @@ public:
         }
         else
         {
-            return writer.addLog<T>(this, std::make_unique<T>(*m_ctrl->value));
+            return writer.addLog<T>(m_ctrl, std::make_unique<T>(*m_ctrl->value));
         }
     }
 
-    void addWatch(std::shared_ptr<RefreshListener> listener)
+    void addWatch(std::shared_ptr<RefreshListener> listener) const
     {
         m_ctrl->watches.insert(listener);
     }
 
-    void notify()
+    void notify() const
     {
-        auto watches = m_ctrl->watches;
-        m_ctrl->watches.clear();  // XXX correct?
-        for (auto w : watches)
-        {
-            w->refresh();  // The crash here is due to a deleted listener being called.
-                           // We need smarter automatic
-        }
+        m_ctrl->notify();
     }
 
-    operator bool() { return static_cast<bool>(m_ctrl->value); }
+    operator bool() const { return static_cast<bool>(m_ctrl->value); }
 
 //private:
     struct ControlBlock
     {
         std::unique_ptr<T> value;
         std::set<std::shared_ptr<RefreshListener>> watches;
+
+        void notify()
+        {
+            auto watchesClone = watches;
+            watches.clear();  // XXX correct?
+            for (auto w : watchesClone)
+            {
+                w->refresh();
+            }
+        }
     };
 
     std::shared_ptr<ControlBlock> m_ctrl;
@@ -224,7 +236,7 @@ private:
 };
 
 template<class T>
-T* Writer::addLog(TxPtr<T> *ptr, std::unique_ptr<T> clone)
+T* Writer::addLog(const std::shared_ptr<typename TxPtr<T>::ControlBlock>& ptr, std::unique_ptr<T> clone)
 {
     // We expect the returned T* to be immediately dereferenced in terms of ->.
     T* ret = clone.get();
@@ -235,7 +247,7 @@ T* Writer::addLog(TxPtr<T> *ptr, std::unique_ptr<T> clone)
 template<class T>
 void* Writer::LogEnt<T>::lookup(void* needle) const
 {
-    if (needle == ptr)
+    if (needle == ptr.get())
     {
         return value.get();
     }
@@ -248,7 +260,7 @@ void* Writer::LogEnt<T>::lookup(void* needle) const
 template<class T>
 void Writer::LogEnt<T>::commit()
 {
-    ptr->m_ctrl->value.swap(value);
+    ptr->value.swap(value);
 }
 
 template<class T>
@@ -329,20 +341,30 @@ struct NodeView
     std::unique_ptr<NodeView> m_right;
 };
 
-void insert(Writer& tx, TxPtr<Tree>& root, int value)
+void insert(Writer& tx, const TxPtr<Tree>& root, int value)
 {
-    Tree* modelp = root.write(tx);
-    if (!modelp)
+    const Tree* modelp = root.read(tx);
+    assert(modelp);
+
+    if (value <= modelp->data)
     {
-        root = TxPtr<Tree>(std::make_unique<Tree>(value));
-    }
-    else if (value <= modelp->data)
-    {
-        insert(tx, modelp->left, value);
+        if (modelp->left)
+        {
+            insert(tx, modelp->left, value);
+        }
+        else {
+            root.write(tx)->left = TxPtr<Tree>(std::make_unique<Tree>(value));
+        }
     }
     else
     {
-        insert(tx, modelp->right, value);
+        if (modelp->right)
+        {
+            insert(tx, modelp->right, value);
+        }
+        else {
+            root.write(tx)->right = TxPtr<Tree>(std::make_unique<Tree>(value));
+        }
     }
 }
 
